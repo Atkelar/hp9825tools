@@ -1,0 +1,17 @@
+#
+# Sample settings file, used by the command line parse.
+#
+# You can specify any of the names (short or long) ones as values here.
+#
+# settings files can be added to the parser via code or the pre-defined @filename option.
+#
+
+fmt:Width = 80
+
+# NOTE: strings after "=" are "trimmed", so use double quotes for cases when that is important! Use \" to escape the double quote in these cases.
+
+fmt:pnf = "Pg: {0} "
+
+# NOTE: switch arguments will not use values.
+
+fmt:mc

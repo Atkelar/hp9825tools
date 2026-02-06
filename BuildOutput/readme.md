@@ -1,0 +1,3 @@
+# just a folder...
+
+This folder collects the outputs from th build script.
