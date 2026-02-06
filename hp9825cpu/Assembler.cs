@@ -56,6 +56,9 @@ namespace HP9825CPU
                     if (!baseAddress.HasValue)
                         throw from.Error(AssemblerErrorCodes.LabelWithoutLocation, "Label '{0}' has no location. Use ORG first!", label);
 
+                    if (CpuConstants.RegisterNames.Any(x=>x == label))
+                        throw from.Error(AssemblerErrorCodes.LabelUsesReservedName, "Label '{0}' is using reserved symbol (register name)!", label);
+
                     if (manager != null)
                     {
                         if (!manager.SetKnownLocation(label, baseAddress.Value))
@@ -408,8 +411,8 @@ namespace HP9825CPU
             return result;
         }
 
-        //private class ExpressionSegment
-
+        // Parses the next part of the line as a register name, *if* it matches one with a termantor following.
+        // i.e. "A " or "A" will match, "A5" will not.
         private static int ParseRegisterName(SourceLineRef from, ref string line, int mask, string mnemonic)
         {
             for (int i = 0; i < CpuConstants.RegisterNames.Length; i++)

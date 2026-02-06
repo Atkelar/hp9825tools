@@ -31,6 +31,8 @@
         public static readonly MnemonicUpdateInfo ClearOrSetMnemonicUpdate = new MnemonicUpdateInfo(MCSetOrClear, 'C', 'S');
         public static readonly MnemonicUpdateInfo DirectOrIndirectMnemonicUpdate = new MnemonicUpdateInfo(MCDirectOrIndirect, '\u0000', 'I');
 
+        // Register names are literal, except when they contain "[]"; these names are there 
+        // to facilitate best-effort decoding of invalid instructions but will yield assembly errors.
         public static readonly string[] RegisterNames =
         {
             "A",
@@ -49,22 +51,22 @@
             "DMAC",
             "C",
             "D",
-            "AR2-0",
-            "AR2-1",
-            "AR2-2",
-            "AR2-3",
+            "AR2",
+            "AR2[1]",
+            "AR2[2]",
+            "AR2[3]",
             "SE",
-            "X-0",
-            "X-1",
-            "X-2",
-            "?-0",  // UNASSIGNED 30-37
-            "?-1",
-            "?-2",
-            "?-3",
-            "?-4",
-            "?-5",
-            "?-6",
-            "?-7"
+            "X",
+            "X[1]",
+            "X[2]",
+            "[30]",  // UNASSIGNED 30-37
+            "[31]",
+            "[32]",
+            "[33]",
+            "[34]",
+            "[35]",
+            "[36]",
+            "[37]"
         };
 
         public static readonly CmdStructure[] Commands = {

@@ -30,5 +30,7 @@ namespace HP9825CPU
         RepMalformed = 24,
 
         InvalidConditionalNesting = 25,
+
+        LabelUsesReservedName = 26
     }
 }
