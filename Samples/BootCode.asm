@@ -1,8 +1,9 @@
+    HED 9825A Boot Code Example
+*
 * This is just a test code.
-* It won't really "boto", but it has most of the
+* It won't really "boot", but it has most of the
 * instructions and symbols defined that make up the boot code.
 *
-    HED 9825A Boot Code Example
     UNL
 * Just an example of "unliste source code".
 * these lines should not appear on the list output.
