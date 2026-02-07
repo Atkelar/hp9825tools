@@ -28,7 +28,7 @@ namespace HP9825Utils
 
         protected override bool BuildReturnCodes(ReturnCodeHandler reg)
         {
-            
+
             Input.RegisterErrors(reg);
             Output.RegisterErrors(reg);
             return base.BuildReturnCodes(reg);
@@ -43,16 +43,13 @@ namespace HP9825Utils
         public InputFileOptions Input { get; set; }
         public OutputFileOptions Output { get; set; }
 
-        public override string? GetExtendedHelp(string? page)
+        public override void WriteExtendedHelp(OutputHandlerBase output, string? page)
         {
-            if (page == null)
-                return @"The normal assembler output of the hp9825 tools is 'normal' - i.e. bit = 0 is stored as 0.
-The processor and system is 'negative logic' however, and so a bit = 0 needs to be stored
-in the EPROMS as a 1 and vice versa. This command will invert a BIN file to fit this
-requirement.
-";
+            if (string.IsNullOrEmpty(page))
+                output.WriteLine(VerbosityLevel.Normal, SplitMode.Word, @"The normal assembler output of the hp9825 tools is 'normal' - i.e. bit = 0 is stored as 0. The processor and system is 'negative logic' however, and so a bit = 0 needs to be stored in the EPROMS as a 1 and vice versa. 
+This command will invert a binary file to fit this requirement.");
             else
-                return $"Unknown detal {page}!";
+                output.WriteLine(VerbosityLevel.Normal, SplitMode.Word, $"Unknown detal {page}!");
         }
     }
 }

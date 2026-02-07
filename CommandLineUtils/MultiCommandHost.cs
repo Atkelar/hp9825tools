@@ -1,23 +1,36 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.ComponentModel.Design;
 using System.Linq;
-using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Dataflow;
 
 namespace CommandLineUtils
 {
+    /// <summary>
+    /// Hosts a multiplexed command, i.e. a whole list of commands to be selected via the first command line argument.
+    /// </summary>
     public class MultiCommandHost
+        : IDisposable
     {
+        /// <summary>
+        /// Initializes the host object.
+        /// </summary>
+        /// <param name="commandName">The command name - used for call syntax display.</param>
+        /// <param name="ignoreCase">true if the command line parser will ignore upper/lower case differences.</param>
         public MultiCommandHost(string commandName, bool ignoreCase = true)
         {
             CommandName = commandName;
             IgnoreCase = ignoreCase;
         }
 
+        /// <summary>
+        /// The command name - used for call syntax display.
+        /// </summary>
         public string CommandName { get; private set; }
+        
+        /// <summary>
+        /// true if the command line parser will ignore upper/lower case differences.
+        /// </summary>
         public bool IgnoreCase { get; private set; }
 
         /// <summary>
@@ -67,28 +80,7 @@ namespace CommandLineUtils
             }
             return this;
         }
-
-        private class CommandRegistration
-        {
-            public string Prefix { get; set; }
-            public string? ShortName { get; set; }
-            public string LongName { get; set; }
-            public string? HelpMessage { get; set; }
-            public Type Implementation { get; set; }
-
-            public ProcessBase CreateImplementation(string cmdName, bool ignoreCase, string procName)
-            {
-                ProcessBase? p = Activator.CreateInstance(Implementation) as ProcessBase;
-                if (p == null)
-                    throw new InvalidOperationException($"Cannot create/cast {Implementation.FullName} to ProcessBase?!");
-                p.CommandName = cmdName;
-                p.IgnoreCase = ignoreCase;
-                p.ProcessName = procName;
-                p.Prepare();
-                return p;
-            }
-        }
-
+        
         private List<CommandRegistration> All = new List<CommandRegistration>();
         private Dictionary<string, CommandRegistration> LongNames = new Dictionary<string, CommandRegistration>();
         private Dictionary<string, CommandRegistration> ShortNames = new Dictionary<string, CommandRegistration>();
@@ -142,47 +134,94 @@ namespace CommandLineUtils
                 Console.WriteLine();
         }
 
-        private int ShowDetailedHelpFor(string cmd, string? page = null)
+        private void WriteDetailedHelpFor(string cmd, string? page = null)
         {
             if (!LongNames.TryGetValue(cmd, out var selected))
             {
                 if (!ShortNames.TryGetValue(cmd, out selected))
                 {
-                    WriteHelpOverview($"Command '{cmd}' was not found");
-                    return -2;
+                    throw ReturnCode.ParseError.Happened("command selection", $"Command '{cmd}' was not found!");
                 }
             }
-            Console.WriteLine("Help for {0}:", selected.LongName);
-            Console.WriteLine();
+            if (Output==null)
+                return;
+            Output.WriteLine( VerbosityLevel.Normal, SplitMode.Word, "Help for {0}:", selected.LongName);
+            Output.WriteLine( VerbosityLevel.Normal);
             if (selected.HelpMessage != null)
             {
-                Console.Write(" Summary: ");
-                Console.WriteLine(selected.HelpMessage);
-                Console.WriteLine();
+                Output.Write( VerbosityLevel.Normal, SplitMode.Word, " Summary: ");
+                Output.Write( VerbosityLevel.Normal, SplitMode.Word, selected.HelpMessage);
+                Output.WriteLine( VerbosityLevel.Normal);
             }
-            ProcessBase p = selected.CreateImplementation(CommandName, IgnoreCase, cmd);
-            var details = p.GetExtendedHelp(page);
-            if (details != null)
-            {
-                Console.WriteLine(details);
-                Console.WriteLine();
-            }
-            details = p.GetParameterHelp(80);
-            if (details != null)
-            {
-                Console.WriteLine(details);
-                Console.WriteLine();
-            }
-            details = p.GetReturnCodeHelp(80);
-            if (details != null)
-            {
-                Console.WriteLine("The process will return the following exit codes:");
-                Console.WriteLine();
-                Console.WriteLine(details);
-                Console.WriteLine();
-            }
-            return 0;
+            ProcessBase p = selected.CreateImplementation(CommandName, IgnoreCase, cmd, false);
+            p.WriteExtendedHelp(Output, page);
+            p.WriteHelpText(Output);
+            p.WriteReturnCodeHelp(Output);
         }
+
+  /// <summary>
+        /// Sets up the banner message for the program.
+        /// </summary>
+        /// <typeparam name="T">Base type for the assembly version; will be used to pull the version number.</typeparam>
+        /// <param name="appName">Application main name.</param>
+        /// <param name="copyrightBy">If provided, a "Copyright by" will be added.</param>
+        /// <param name="copyrightFromYear">If provided, a x-y part will be added to the copyright message.</param>
+        /// <param name="copyrightToYear">If provided, the copyright to year will be fixed to this one, otherwise the "today" year will be used. Either will only show if larger than the from year.</param>
+        public void SetupBanner<T>(string appName, string? copyrightBy, int? copyrightFromYear = null, int? copyrightToYear = null)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            sb.Append(appName);
+
+            var t = typeof(T);
+            var version = t.Assembly.GetName().Version;
+
+            sb.Append(' ');
+            sb.Append(version);
+
+            if (copyrightBy != null)
+            {
+                sb.Append(" Copyright (c) ");
+                if (copyrightFromYear.HasValue)
+                {
+                    sb.Append(copyrightFromYear);
+                    var yt = copyrightToYear.GetValueOrDefault(DateTime.Today.Year);
+                    if(yt > copyrightFromYear.Value)
+                    {
+                        sb.Append(" - ");
+                        sb.Append(yt);
+                    }
+                    sb.Append(' ');
+                }
+                sb.Append("by ");
+                sb.Append(copyrightBy);
+            }
+
+            BannerMessage = sb.ToString();
+        }
+
+        private string? BannerMessage = null;
+
+        public OutputHandlerBase? Output {get;private set;}
+
+        /// <summary>
+        /// Provide an output handler implementation. If not specified, the normal console will be used.
+        /// </summary>
+        /// <param name="handler">The implementation.</param>
+        public void OutputTo(OutputHandlerBase handler)
+        {
+            if(object.ReferenceEquals(Output, handler))
+                return;
+
+            var x = Output;
+            if (Output != null)
+            {
+                Output.WriteLine(VerbosityLevel.Trace, "switching output handler...");
+            }
+            Output = handler;
+            x?.Dispose();
+        }
+
 
         /// <summary>
         /// Runs the program, including any pre-defined parameter parsing.
@@ -204,13 +243,20 @@ namespace CommandLineUtils
                         cmd = cmd.ToLowerInvariant();
                     if (cmd == "help")  // predefined...
                     {
+                        if (Output == null)
+                        {
+                            var x = new ConsoleBasedOutput();
+                            x.Prepare(VerbosityLevel.Normal);
+                            this.OutputTo(x);
+                        }
+
                         if (args.Length > 1)
                         {
                             cmd = args[1].Trim();
                             if (IgnoreCase)
                                 cmd = cmd.ToLowerInvariant();
                             // help cmd
-                            return ShowDetailedHelpFor(cmd, args.Length > 2 ? args[2] : null);
+                            WriteDetailedHelpFor(cmd, args.Length > 2 ? args[2] : null);
                         }
                         else
                         {
@@ -227,27 +273,79 @@ namespace CommandLineUtils
                             }
                         }
                         // got a command now...
-                        var thisCommand = selected.CreateImplementation(CommandName, IgnoreCase, cmd);
+                        var thisCommand = selected.CreateImplementation(CommandName, IgnoreCase, cmd, false);
                         string[] newArgs = new string[args.Length - 1];
                         Array.Copy(args, 1, newArgs, 0, newArgs.Length);
-                        await thisCommand.Run(newArgs);
+                        if (await thisCommand.Parse(newArgs) != null)
+                            throw ReturnCode.ParseError.Happened($"Command '{cmd}' requsted help. Use global help command instead!");
+                        
+                        if (Output == null)
+                        {
+                            var x = new ConsoleBasedOutput();
+                            x.Prepare(VerbosityLevel.Normal);
+                            this.OutputTo(x);
+                        }
+
+                        thisCommand.SetOutput(Output!);
+                        if (BannerMessage != null)
+                        {
+                            Output?.WriteLine(VerbosityLevel.Normal, BannerMessage);
+                        }
+                        await thisCommand.Run();
                     }
                 }
             }
             catch (ReturnCodeException ex)
             {
-                if (ex.IsNonError)
-                    Console.WriteLine(ex.Message);
-                if (!ex.IsNonError)
-                    Console.WriteLine(ex.Message);
+                if (Output == null)
+                {
+                    var x = new ConsoleBasedOutput();
+                    x.Prepare(VerbosityLevel.Normal);
+                    this.OutputTo(x);
+                }
+                Output?.WriteLine(ex.IsNonError ?  VerbosityLevel.Normal : VerbosityLevel.Errors, SplitMode.Word, ex.Message);
                 return ex.Code;
             }
             catch(Exception ex)
             {
-                Console.WriteLine(ReturnCode.UhandledError.ErrorMessageTemplate, ex.Message);
+                if (Output == null)
+                {
+                    var x = new ConsoleBasedOutput();
+                    x.Prepare(VerbosityLevel.Normal);
+                    this.OutputTo(x);
+                }
+                Output?.WriteLine(VerbosityLevel.Errors, SplitMode.Word, ReturnCode.UhandledError.ErrorMessageTemplate, ex.Message);
                 return ReturnCode.UhandledError.Code;
             }
             return ReturnCode.Success.Code; 
         }
-    }
+        private bool IsDisposed = false;
+
+        /// <summary>
+        /// Throws the <see cref="ObjectDisposedException"/> if the object is disposed, does nothing if not.
+        /// </summary>
+        protected void DemandNotDisposed()
+        {
+            ObjectDisposedException.ThrowIf(IsDisposed, this);
+        }
+
+        /// <summary>
+        /// Override to handle disposable objects.
+        /// </summary>
+        /// <param name="isDisposing">True if the call came from the explicit dispose, false if it came from a destructor.</param>
+        protected virtual void Dispose(bool isDisposing)
+        {
+        }
+        /// <summary>
+        /// Implements <see cref="IDisposable"/> 
+        /// </summary>
+        public void Dispose()
+        {
+            if (!IsDisposed)
+            {
+                Dispose(true);
+            }
+            IsDisposed = true;
+        }
+   }
 }

@@ -8,9 +8,8 @@ namespace HP9825Utils
     {
         static async System.Threading.Tasks.Task<int> Main(string[] args)
         {
-            Console.WriteLine("9825 CPU Tools, {0} (c) 2026 by Atkelar", typeof(Program).Assembly.GetName().Version);
-
             var host = new MultiCommandHost("hp9825utils");
+            host.SetupBanner<Program>("9825 CPU Tools", "Atkelar", 2026);
 
             host.Register<InvertBitsCommand>();
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
@@ -18,6 +19,11 @@ namespace CommandLineUtils
             IgnoreCase = ignoreCase;
         }
 
+        /// <summary>
+        /// True to allow the command host to react to the "help requested" flag, false to turn it into an error condition.
+        /// </summary>
+        public bool SupportsHelp { get; set; } = true;
+
         private string CommandName;
         private bool IgnoreCase;
         public T AddOptions<T>(string? prefix = null, T? overrideDefaults = null)
@@ -32,6 +38,18 @@ namespace CommandLineUtils
             _Registry.Add((Prefix: prefix, Props: result));
             return result;
         }
+
+        /// <summary>
+        /// Adds a file to read before the actual command line parsing takes place.
+        /// </summary>
+        /// <param name="filename">The filename.</param>
+        public void AddOptionalDefault(string filename)
+        {
+            _OptionalDefaults ??= new List<string>();
+            _OptionalDefaults.Add(filename);
+        }
+
+        private List<string>? _OptionalDefaults = null;
 
         public async System.Threading.Tasks.Task<bool> LoadFrom(string filename)
         {
@@ -98,6 +116,14 @@ namespace CommandLineUtils
 
         public async System.Threading.Tasks.Task ParseFrom(string[] args)
         {
+            if(_OptionalDefaults !=null)
+            {
+                foreach(var fn in _OptionalDefaults)
+                {
+                    await LoadFrom(fn);
+                }
+            }
+
             // prepare lists...
             Positional = Positional.OrderBy(x => x.Positional!.Value).ToList();
 
@@ -123,7 +149,13 @@ namespace CommandLineUtils
                             name = name.ToLowerInvariant();
                         if (name == "help")
                         {
-                            HelpRequested = true;
+                            if (i+1 <args.Length)
+                            {
+                                i++;
+                                HelpRequested = args[i];
+                            }
+                            else
+                                HelpRequested = string.Empty;
                         }
                         else
                         {
@@ -154,7 +186,7 @@ namespace CommandLineUtils
                                 name = name.ToLowerInvariant();
                             if (name == "?")
                             {
-                                HelpRequested = true;
+                                HelpRequested = string.Empty;
                             }
                             else
                             {
@@ -188,6 +220,9 @@ namespace CommandLineUtils
                 i++;
             }
 
+            if (HelpRequested != null)
+                return;
+
             bool ok = true;
             StringBuilder sb = new StringBuilder();
             foreach (var a in All)
@@ -205,68 +240,68 @@ namespace CommandLineUtils
                 throw ReturnCode.ParseError.Happened(sb.ToString(), "Required parameters are missing!");
         }
 
-        public string GetHelpText(int width = 80, string? syntaxPrefix = null)
+        public void WriteHelpText(OutputHandlerBase target, string? commandPrefix = null)
         {
-            StringBuilder sb = new StringBuilder();
-
-            // positional first...
-            sb.AppendLine("Call syntax:");
-            sb.Append(" ");
-            if (syntaxPrefix == null)
+            target.WriteLine(VerbosityLevel.Normal);
+            target.WriteLine(VerbosityLevel.Normal, SplitMode.Word, "Call syntax: ");
+            using(target.Indent( VerbosityLevel.Normal, 1))
             {
-                sb.Append(CommandName);
-                sb.AppendLine(" --help");
-                sb.AppendLine("    Show complete help info.");
-            }
-            sb.AppendLine();
-            sb.Append(' ');
-            sb.Append(CommandName);
-            if (syntaxPrefix != null)
-            {
-                sb.Append(' ');
-                sb.Append(syntaxPrefix);
-            }
-            foreach (var p in Positional)
+                target.WriteLine(VerbosityLevel.Normal);
+           
+                if (commandPrefix == null)
                 {
-                    sb.Append(" ");
-                    if (!p.Definition.Required)
-                        sb.AppendFormat("[{0}]", p.LongName);
-                    else
-                        sb.Append(p.LongName);
+                    target.Write(VerbosityLevel.Normal, SplitMode.None, CommandName);
+                    target.WriteLine(VerbosityLevel.Normal, SplitMode.None, " help");
+                    using(target.Indent( VerbosityLevel.Normal, 4))
+                        target.WriteLine(VerbosityLevel.Normal, SplitMode.Word, "Show complete help info.");
+                    target.WriteLine(VerbosityLevel.Normal);
                 }
-
-            foreach (var p in All.Where(x => !x.Positional.HasValue).OrderBy(x => x.LongName))
-            {
-                sb.Append(' ');
-                if (!p.Definition.Required)
-                    sb.Append('[');
-                sb.Append("--");
-                sb.Append(p.LongName);
-                if (p.Property.PropertyType == typeof(bool))
+                using(target.IndentFor(VerbosityLevel.Normal, CommandName))
                 {
-                    // bool, done. flag argument.
-                }
-                else
-                {
-                    if (p.Property.PropertyType == typeof(int))
+                    if (commandPrefix != null)
                     {
-                        sb.Append(" 123");
+                        target.Write(VerbosityLevel.Normal, SplitMode.None, " " + commandPrefix);
                     }
-                    else
+                    foreach (var p in Positional)
                     {
-                        sb.Append(" \"str\"");
+                        target.Write(VerbosityLevel.Normal, SplitMode.None, " ");
+                        if (!p.Definition.Required)
+                            target.Write(VerbosityLevel.Normal, SplitMode.None, $" [{p.LongName}]");
+                        else
+                            target.Write(VerbosityLevel.Normal, SplitMode.None, $" {p.LongName}");
+                    }
+
+                    foreach (var p in All.Where(x => !x.Positional.HasValue).OrderBy(x => x.LongName))
+                    {
+                        string value = string.Empty;
+                        if (p.Property.PropertyType == typeof(bool))
+                        {
+                            // bool, done. flag argument.
+                        }
+                        else
+                        {
+                            if (p.Property.PropertyType == typeof(int))
+                            {
+                                value = " 123";
+                            }
+                            else
+                            {
+                                value = " \"str\"";
+                            }
+                        }
+                            if (!p.Definition.Required)
+                                target.Write(VerbosityLevel.Normal, SplitMode.None, $" [--{p.LongName}{value}]");
+                            else
+                                target.Write(VerbosityLevel.Normal, SplitMode.None, $" {p.LongName}{value}");
                     }
                 }
-                if (!p.Definition.Required)
-                    sb.Append(']');
             }
-            sb.AppendLine();
-
-            if (HelpRequested)
+            target.WriteLine(VerbosityLevel.Normal);
+            if (HelpRequested != null)
             {
-                sb.AppendLine();
-                sb.AppendLine("Details:");
-                sb.AppendLine();
+                target.WriteLine(VerbosityLevel.Normal);
+                target.WriteLine(VerbosityLevel.Normal, SplitMode.None, "Details:");
+                target.WriteLine(VerbosityLevel.Normal);
                 if (Positional.Any())
                 {
                     int maxLen = Positional.Max(x => x.LongName.Length);
@@ -274,9 +309,12 @@ namespace CommandLineUtils
                     // append details...
                     foreach (var p in Positional)
                     {
-                        string details = $"{(p.Definition.Required ? "mandatory, " : "")}default: {p.Definition.DefaultValue ?? "<none>"}{(p.ShortName != null ? ", alias: " + p.ShortName : null)}\n\n{p.GetValueHelpString()}\n\n{p.Definition.HelpText ?? "<no details>"}";
-                        WriteIndented(sb, width, maxLen + 4, p.LongName, details);
-                        sb.AppendLine();
+                        using (target.IndentFor( VerbosityLevel.Normal, " " + p.LongName, maxLen + 3))
+                        {
+                            target.WriteLine(VerbosityLevel.Normal, SplitMode.Word, $"{(p.Definition.Required ? "mandatory, " : "")}default: {p.Definition.DefaultValue ?? "<none>"}{(p.ShortName != null ? ", alias: " + p.ShortName : null)}");
+                            target.WriteLine(VerbosityLevel.Normal, SplitMode.Word, p.Definition.HelpText ?? "<no details>");
+                            target.WriteLine(VerbosityLevel.Normal);
+                        }
                     }
                 }
                 if (All.Any(x=>!x.Positional.HasValue))
@@ -286,82 +324,20 @@ namespace CommandLineUtils
                     // append details...
                     foreach (var p in All.Where(x=>!x.Positional.HasValue).OrderBy(x=>x.Prefix).ThenBy(x=>x.LongName))
                     {
-                        string details = $"{(p.Definition.Required ? "mandatory, " : "")}default: {p.Definition.DefaultValue ?? "<none>"}{(p.ShortName != null ? " alias: " + p.ShortName : null)}\n\n{p.GetValueHelpString()}\n\n{p.Definition.HelpText ?? "<no details>"}";
-                        WriteIndented(sb, width, maxLen + 4, p.LongName, details);
-                        sb.AppendLine();
-                    }
-                }
-            }
-
-            return sb.ToString();
-        }
-
-        private static void WriteIndented(StringBuilder sb, int width, int indentTo, string title, string content)
-        {
-            if (indentTo > width / 2)   // sanitize...
-                indentTo = width / 2;
-            StringReader sr = new StringReader(content);
-            sb.Append(' ');
-            sb.Append(title);
-            int currentPos = 0;
-            if (title.Length + 2 > indentTo)
-            {
-                sb.AppendLine();
-            }
-            else
-            {
-                int n = (indentTo - title.Length) - 1;
-                sb.Append(' ', n);
-                currentPos = indentTo;
-            }
-            string? line;
-            while ((line = sr.ReadLine()) != null)
-            {
-                if (line.Length == 0)
-                {
-                    // force line break;
-                    sb.AppendLine();
-                    currentPos = 0;
-                    continue;
-                }
-                var words = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                foreach (var w in words)
-                {
-                    int l = w.Length;
-                    if (currentPos < indentTo)
-                    {
-                        sb.Append(' ', indentTo);
-                        currentPos = indentTo;
-                        sb.Append(w);
-                        currentPos += w.Length;
-                    }
-                    else
-                    {
-                        if (currentPos > indentTo)
-                            l++;    // space!
-                        if (currentPos + l > width)
+                        using (target.IndentFor( VerbosityLevel.Normal, " " + p.LongName, maxLen + 3))
                         {
-                            sb.AppendLine();
-                            sb.Append(' ', indentTo);
-                            currentPos = indentTo;
+                            target.WriteLine(VerbosityLevel.Normal, SplitMode.Word, $"{(p.Definition.Required ? "mandatory, " : "")}default: {p.Definition.DefaultValue ?? "<none>"}{(p.ShortName != null ? ", alias: " + p.ShortName : null)}");
+                            target.WriteLine(VerbosityLevel.Normal, SplitMode.Word, p.Definition.HelpText ?? "<no details>");
+                            target.WriteLine(VerbosityLevel.Normal);
                         }
-                        else
-                        {
-                            sb.Append(' ');
-                            currentPos += 1;
-                        }
-                        sb.Append(w);
-                        currentPos += w.Length;
                     }
                 }
             }
-            if (currentPos > 0)
-                    sb.AppendLine();
         }
 
         public bool ParsedOk { get; private set; }
 
-        public bool HelpRequested { get; internal set; }
+        public string? HelpRequested { get; internal set; }
 
         private class ParamReg
         {

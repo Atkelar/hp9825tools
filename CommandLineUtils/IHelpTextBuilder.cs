@@ -4,6 +4,6 @@ namespace CommandLineUtils
 {
     internal interface IHelpTextBuilder
     {
-        void CreatHelpText(StringBuilder sb, int width);
+        void WriteHelpText(OutputHandlerBase target);
     }
 }

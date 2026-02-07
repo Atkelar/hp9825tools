@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -46,14 +47,16 @@ namespace CommandLineUtils
 
             private ReturnCode[] list;
 
-            public void CreatHelpText(StringBuilder sb, int width)
+            public void WriteHelpText(OutputHandlerBase target)
             {
                 foreach(var c in list)
                 {
-                    sb.AppendFormat("  {0} - {1}", c.Code, c.HelpMessage ?? "<no details provided>");
-                    sb.AppendLine();
+                    using(target.IndentFor(VerbosityLevel.Normal, $"  {c.Code,3} - "))
+                    {
+                        target.WriteLine(VerbosityLevel.Normal, SplitMode.Word, c.HelpMessage ?? "<no details provided>");
+                    }
                 }
-                sb.AppendLine();
+                target.WriteLine(VerbosityLevel.Normal);
             }
         }
 
@@ -105,16 +108,17 @@ namespace CommandLineUtils
         /// <summary>
         /// Create the full help text for the list of exit codes.
         /// </summary>
-        /// <param name="width">The output format width.</param>
-        /// <returns>The formatted text message.</returns>
-        public string GetHelpText(int width = 80)
+        /// <param name="output">The output target.</param>
+        public void WriteHelpText(OutputHandlerBase output)
         {
-            StringBuilder sb = new StringBuilder();
+            if (_HelpList.Any())
             {
+                output.WriteLine("The process will return the following exit codes:");
+                output.WriteLine();
                 foreach(var c in _HelpList)
-                    c.CreatHelpText(sb, width);
+                    c.WriteHelpText(output);
+                output.WriteLine();
             }
-            return sb.ToString();
         }
 
         /// <summary>

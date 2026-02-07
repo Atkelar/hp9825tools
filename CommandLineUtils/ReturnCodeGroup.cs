@@ -119,14 +119,15 @@ namespace CommandLineUtils
             return new ReturnCode(reg.Code, reg.IsNonError, reg.ErrorMessageTemplate, reg.HelpMessage);
         }
 
-        void IHelpTextBuilder.CreatHelpText(StringBuilder sb, int width)
+        void IHelpTextBuilder.WriteHelpText(OutputHandlerBase target)
         {
             foreach(var c in Index.Values.OrderBy(x=>x.Code))
             {
-                sb.AppendFormat("  {0} - {1}", c.Code, c.HelpMessage ?? "<no details provided>");
-                sb.AppendLine();
+                using(target.IndentFor(VerbosityLevel.Normal, $"  {c.Code,3} - "))
+                {
+                    target.WriteLine(VerbosityLevel.Normal, SplitMode.Word, c.HelpMessage ?? "<no details provided>");
+                }
             }
-            sb.AppendLine();
         }
 
     }

@@ -7,6 +7,7 @@ namespace CommandLineUtils
     /// Base class for "hosted processes" - i.e. multiplexed binaries. If the CLI application supports more than one "command" like "app set ..." and "app get ...", each of these commands gets implemented via one derived class.
     /// </summary>
     public abstract class ProcessBase
+        : IDisposable
     {
         /// <summary>
         /// When created by the infrastructure, this property reflects the <see cref="MultiCommandHost.CommandName"/> of the 
@@ -39,21 +40,76 @@ namespace CommandLineUtils
         /// </summary>
         protected abstract Task RunNow();
 
+        public void WriteLine(VerbosityLevel level, SplitMode split, string? message)
+        {
+            if (_Output != null)
+                _Output.WriteLine(level, split, message);
+            else
+            {
+                switch (level)
+                {
+                    case VerbosityLevel.Errors:
+                        Console.Error.WriteLine(message);
+                        break;
+                    default:
+                        Console.Out.WriteLine(message);
+                        break;
+                }
+            }
+        }
+
+        public void Write(VerbosityLevel level, SplitMode split, string message)
+        {
+            if (_Output != null)
+                _Output.Write(level, split, message);
+            else
+            {
+                switch (level)
+                {
+                    case VerbosityLevel.Errors:
+                        Console.Error.Write(message);
+                        break;
+                    default:
+                        Console.Out.Write(message);
+                        break;
+                }
+            }
+        }
+
+        internal void SetOutput(OutputHandlerBase output)
+        {
+            _Output = output;
+        }
+
+        private OutputHandlerBase? _Output;
+       
+
+
         /// <summary>
         /// Runs the command line parsing and backing command, according to the specs.
         /// </summary>
-        /// <param name="args">The command line arguments for the command.</param>
-        public async Task Run(string[] args)
+        public async Task Run()
         {
             if (_Parameters == null)
                 throw new InvalidOperationException("Call sequence error; need to 'prepare' first!");
-            await _Parameters.ParseFrom(args);
-            if (_Parameters.HelpRequested)
-                throw ReturnCode.ParseError.Happened(string.Format("Use '{0} help {1}' for help on {0}!", CommandName, ProcessName));
             if (!_Parameters.ParsedOk)  // the boolean option is to have the capability to "add more parameters" via multiple parsefrom calls...
                 throw ReturnCode.ParseError.Happened("The parameters were valid on their own, but didn't yield a valid combination!");
             await RunNow();
         }
+
+        /// <summary>
+        /// Parse the command line args. If one of them was "help", the result is non-null; either the requested help page or an empty string.
+        /// </summary>
+        /// <param name="args">The command line args.</param>
+        /// <returns>Null if the call can go ahead, non-null if help was requested.</returns>
+        public async Task<string?> Parse(string[] args)
+        {
+            if (_Parameters == null)
+                throw new InvalidOperationException("Call sequence error; need to 'prepare' first!");
+            await _Parameters.ParseFrom(args);
+            return _Parameters.HelpRequested;
+        }
+
 
         private ParameterHandler? _Parameters;
         private ReturnCodeHandler? _ReturnCodes;
@@ -61,9 +117,10 @@ namespace CommandLineUtils
         /// <summary>
         /// Call this to bootstrap the object. Initialized commands and return codes.
         /// </summary>
-        public void Prepare()
+        public void Prepare(bool supportsHelp = true)
         {
             _Parameters = new ParameterHandler(CommandName, IgnoreCase);
+            _Parameters.SupportsHelp = supportsHelp;
             BuildArguments(_Parameters);
             var rc = new ReturnCodeHandler(true);
             if(BuildReturnCodes(rc))
@@ -83,26 +140,25 @@ namespace CommandLineUtils
         /// <summary>
         /// Creates the parameter help output.
         /// </summary>
-        /// <param name="width">Formatting width.</param>
+        /// <param name="output">The output target.</param>
         /// <returns>The formatted string, or null if there are no parameters defined.</returns>
-        public string? GetParameterHelp(int width = 80)
+        public void WriteHelpText(OutputHandlerBase? output)
         {
-            if (_Parameters != null)
+            output ??= _Output;
+            if (_Parameters != null && output != null)
             {
-                _Parameters.HelpRequested = true;
-                return _Parameters.GetHelpText(width, ProcessName);
+                _Parameters.HelpRequested = string.Empty;
+                _Parameters.WriteHelpText(output, ProcessName);
             }
-            return null;
         }
 
         /// <summary>
         /// Creates the return code listing for a process.
         /// </summary>
-        /// <param name="width">Formatting width.</param>
-        /// <returns>The formatted string, or null if there are no return codes defined.</returns>
-        public string? GetReturnCodeHelp(int width = 80)
+        /// <param name="output">Target for writing.</param>
+        public void WriteReturnCodeHelp(OutputHandlerBase output)
         {
-            return _ReturnCodes?.GetHelpText(width);
+            _ReturnCodes?.WriteHelpText(output);
         }
 
         /// <summary>
@@ -110,9 +166,38 @@ namespace CommandLineUtils
         /// </summary>
         /// <param name="page">If the user requested help via 'help command xyz' this will be the 'xyz' parameter. Null if ther was no additional parameter.</param>
         /// <returns>Null for "nu help" or a multi-line formatted plain text string to show.</returns>
-        public virtual string? GetExtendedHelp(string? page)
+        public virtual void WriteExtendedHelp(OutputHandlerBase output, string? page)
         {
-            return null;
+        }
+
+        /// <summary>
+        /// Throws the <see cref="ObjectDisposedException"/> if the object is disposed, does nothing if not.
+        /// </summary>
+        protected void DemandNotDisposed()
+        {
+            ObjectDisposedException.ThrowIf(IsDisposed, this);
+        }
+
+        private bool IsDisposed = false;
+
+        /// <summary>
+        /// Override to handle disposable objects.
+        /// </summary>
+        /// <param name="isDisposing">True if the call came from the explicit dispose, false if it came from a destructor.</param>
+        protected virtual void Dispose(bool isDisposing)
+        {
+        }
+
+        /// <summary>
+        /// Implements <see cref="IDisposable"/> 
+        /// </summary>
+        public void Dispose()
+        {
+            if (!IsDisposed)
+            {
+                Dispose();
+            }
+            IsDisposed = true;
         }
     }
 }
