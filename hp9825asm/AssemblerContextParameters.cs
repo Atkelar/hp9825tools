@@ -15,6 +15,13 @@ namespace HP9825Assembler
         [Argument("l", "Listing", HelpText = "A file name for the listing. If not specified, stdout will be used. Specify '-' for no listing output.")]
         public string? ListingFile { get; set; } = null;
 
+        [Argument("x", "CrossRef", HelpText = "A file name for the cross reference output. If not specified, stdout will be used. Specify '-' for no cross reference output.")]
+        public string? CrossRefFile { get; set; } = null;
+
+        [Argument("xs", "SorfRefs", HelpText = "Specify how to sort the cross references. By address (A = default) or by name (N)")]
+        public string CrossRefSort { get; set; } = "A";
+        
+
         [Argument("o", "Output", HelpText = "The output filename. If not provided, the assembler will only create the listing.")]
         public string? OutputFile { get; set; } = null;
 

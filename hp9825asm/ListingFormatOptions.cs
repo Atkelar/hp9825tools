@@ -50,7 +50,6 @@ namespace HP9825Assembler
             get { return Options.PageNumberFormat; }
             set { Options.PageNumberFormat = value; }
         }
-        
 
         [Argument("hf", "HeaderFormat", HelpText = "The style of the page header. Use either 'n' for none, 'hp' for HP defaults, 'a' for all, or a combination of the following letters: l=headline, #=page number, f=filename, i=include headline in page when it is changed.", DefaultValue = "hp")]
         public string x

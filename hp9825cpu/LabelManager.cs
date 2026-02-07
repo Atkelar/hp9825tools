@@ -14,7 +14,6 @@ namespace HP9825CPU
 
         private Dictionary<string, int> _List = new Dictionary<string, int>();
         private List<(string Label, Action<int> Recevier)> _Relocate = new List<(string Label, Action<int> Recevier)>();
-
         private List<Action> _Dependencies = new List<Action>();
 
         public void RegisterRelocationDependency(Action callback)
@@ -140,6 +139,34 @@ namespace HP9825CPU
         public void SetEnded()
         {
             IsEnded = true;
+        }
+
+        public void CreateCrossReference(ListingPrinter printer, bool sortAlphabetically = false)
+        {
+            if (_Relocate.Count >0)
+            {
+                foreach(var x in _Relocate.OrderBy(x=>x.Label))
+                {
+                    printer.PrintCorssReferenceLine(null, x.Label);
+                }
+            }
+            if (_List.Count>0)
+            {
+                if (sortAlphabetically)
+                {
+                    foreach(var x in _List.OrderBy(x=>x.Key))
+                    {
+                        printer.PrintCorssReferenceLine(x.Value, x.Key);
+                    }
+                }
+                else
+                {
+                    foreach(var x in _List.OrderBy(x=>x.Value))
+                    {
+                        printer.PrintCorssReferenceLine(x.Value, x.Key);
+                    }
+                }
+            }
         }
     }
 

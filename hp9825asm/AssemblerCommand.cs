@@ -4,6 +4,8 @@ using System.IO;
 using System;
 using HP9825CPU;
 using System.Collections.Generic;
+using System.Reflection.Emit;
+using Microsoft.VisualBasic;
 
 namespace HP9825Assembler
 {
@@ -37,7 +39,9 @@ namespace HP9825Assembler
         protected override async Task RunNow()
         {
             bool closeWriter = false;
+            bool closeXRefWriter = false;
             TextWriter? sourceTo = null;
+            TextWriter? crossRefTo = null;
             TextReader? input = null;
             try
             {
@@ -58,6 +62,17 @@ namespace HP9825Assembler
                 else
                     sourceTo = Console.Out;
 
+                if (!string.IsNullOrWhiteSpace(ContextParameters.CrossRefFile))
+                {
+                    if(ContextParameters.CrossRefFile !="-")
+                    {
+                        closeXRefWriter = true;
+                        crossRefTo = System.IO.File.CreateText(ContextParameters.CrossRefFile);
+                    }
+                }
+                else
+                    crossRefTo = Console.Out;
+
                 string? line;
 
                 List<AssemblyLine> lines = new List<AssemblyLine>();
@@ -66,7 +81,7 @@ namespace HP9825Assembler
                 LabelManager manager = new LabelManager();
                 int? repCount = null;
 
-                ListingPrinter printer = new ListingPrinter(Format.PageWidth, Format.PageHeight, Format.Options, ContextParameters.Use16Bit, sourceTo);
+                ListingPrinter printer = new ListingPrinter(Format.PageWidth, Format.PageHeight, Format.Options, ContextParameters.Use16Bit, sourceTo, crossRefTo);
                 printer.Filename = System.IO.Path.GetFileName(ContextParameters.InputFile);
 
                 char Condiational = ' ';    // no condition right now...
@@ -145,6 +160,8 @@ namespace HP9825Assembler
                     cl.CreateOutput(printer);
                 }
 
+                manager.CreateCrossReference(printer, ContextParameters.CrossRefSort == "N");
+
                 if (!string.IsNullOrWhiteSpace(ContextParameters.BeautyFile))
                 {
                     using (var bf = System.IO.File.CreateText(ContextParameters.BeautyFile))
@@ -199,6 +216,8 @@ namespace HP9825Assembler
             {
                 if (closeWriter)
                     sourceTo?.Dispose();
+                if (closeXRefWriter)
+                    crossRefTo?.Dispose();
             }
         }
     }

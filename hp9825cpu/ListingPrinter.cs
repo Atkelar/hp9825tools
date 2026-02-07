@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 
 namespace HP9825CPU
 {
@@ -12,18 +13,19 @@ namespace HP9825CPU
         /// <param name="pageHeight">The number of lines on the page.</param>
         /// <param name="opts">The formatting options.</param>
         /// <param name="use16Bit">True to use 16-bit address formatting (one more digit in octal).</param>
-        public ListingPrinter(int width = 80, int pageHeight = 60, CodeFormatOptions? opts = null, bool use16Bit = false, System.IO.TextWriter? target = null)
+        public ListingPrinter(int width = 80, int pageHeight = 60, CodeFormatOptions? opts = null, bool use16Bit = false, TextWriter? target = null, TextWriter? crossRefTo=null)
         {
             Width = width;
             PageHeight = pageHeight;
             Format = opts ?? new CodeFormatOptions();
             _Output = target ?? new StringWriter();
+            _CrossRefOutput = crossRefTo ?? new StringWriter();
             _Is16Bit = use16Bit;
         }
 
         private readonly bool _Is16Bit;
         private TextWriter _Output;
-
+        private TextWriter _CrossRefOutput;
         int _CurrentLine = -1;  // current line index; if 0 we are pre-page (inter-page gap), if -1 we are pre-output.
         int _CurrentPage = 0;   // current page number.
         int _LineCounter = 0;   // source line counter.
@@ -328,9 +330,17 @@ namespace HP9825CPU
 
         public CodeFormatOptions Format { get; private set; }
 
+        public void PrintCorssReferenceLine(int? location, string label)
+        {
+            _CrossRefOutput.WriteLine(" {0,-5} {1}", label, Format.FormatWord(location, !_Is16Bit));
+        }
+
         public override string ToString()
         {
-            return _Output.ToString();
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine(_Output?.ToString() ?? string.Empty);
+            sb.AppendLine(_CrossRefOutput?.ToString() ?? string.Empty);
+            return sb.ToString();
         }
     }
 }
