@@ -25,15 +25,6 @@ namespace HP9825Utils
                 mem[i + inputdata.Offset] = (~mem[i + inputdata.Offset]) & 0xFFFF;
             }
 
-            using(var t = Out.Table(VerbosityLevel.Normal, 
-                x=> x.RowCountTemplate("{0} rows").Separators(true,true, true)
-                    .Column(5, c=>c.Head("Test").Format("000").Align(HorizontalAlignment.Right, TextTrimming.End))
-                    .Column(3, 10, c=>c.Align(HorizontalAlignment.Center))))
-            {
-                t.Line(12,3,4,5);
-                t.Line(12);
-            }
-
             await OutOptions.WriteNow(mem, inputdata.ActualFilename, inputdata.Offset, inputdata.WordCount);
         }
 
