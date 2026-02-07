@@ -10,9 +10,9 @@ using System.Text.Json.Serialization;
 
 namespace CommandLineUtils
 {
-    public class ParameterBuilder
+    public class ParameterHandler
     {
-        public ParameterBuilder(string commandName, bool ignoreCase = true)
+        public ParameterHandler(string commandName, bool ignoreCase = true)
         {
             CommandName = commandName;
             IgnoreCase = ignoreCase;
@@ -108,10 +108,10 @@ namespace CommandLineUtils
                 if (args[i].StartsWith('@'))
                 {
                     var fn = args[i].Substring(1);
-                    Console.WriteLine("Loading {0}...", fn);
                     var b = await LoadFrom(fn);
                     if (!b)
-                        throw new InvalidOperationException($"couldn't load settings from file {args[i]}");
+                        throw ReturnCode.SettingsFileNotFound.Happened(args[i]);
+                    Console.WriteLine("Loaded settings from {0}...", fn);
                 }
                 else
                 {
@@ -128,14 +128,14 @@ namespace CommandLineUtils
                         else
                         {
                             if (!LongNames.TryGetValue(name, out var pp))
-                                throw new InvalidOperationException($"Parameter {args[i]} was not found!");
+                                throw ReturnCode.ParseError.Happened(args[i], "Paramaeter name not found!");
                             if (pp.HasBeenSet)
-                                throw new InvalidOperationException($"Parameter {args[i]} defined multiple times!");
+                                throw ReturnCode.ParseError.Happened(args[i], "Parameter defined multiple times!");
                             if (pp.HasValue)
                             {
                                 i++;
                                 if (i >= args.Length)
-                                    throw new InvalidOperationException($"Parameter {args[i - 1]} is missing the value!");
+                                    throw ReturnCode.ParseError.Happened(args[i-1], "Parameter is missing the value!");
                                 pp.SetValue(args[i]);
                             }
                             else
@@ -159,14 +159,14 @@ namespace CommandLineUtils
                             else
                             {
                                 if (!ShortNames.TryGetValue(name, out var pp))
-                                    throw new InvalidOperationException($"Parameter {args[i]} was not found!");
+                                    throw ReturnCode.ParseError.Happened(args[i], "Parameter was not found!");
                                 if (pp.HasBeenSet)
-                                    throw new InvalidOperationException($"Parameter {args[i]} defined multiple times!");
+                                    throw ReturnCode.ParseError.Happened(args[i], "Parameter was defined multiple times!");
                                 if (pp.HasValue)
                                 {
                                     i++;
                                     if (i >= args.Length)
-                                        throw new InvalidOperationException($"Parameter {args[i - 1]} is missing the value!");
+                                        throw ReturnCode.ParseError.Happened(args[i-1], "Parameter is missing the value!");
                                     pp.SetValue(args[i]);
                                 }
                                 else
@@ -180,9 +180,7 @@ namespace CommandLineUtils
                             // positional...
                             var p = Positional.FirstOrDefault(x => !x.HasBeenSet);
                             if (p == null)
-                            {
-                                throw new InvalidOperationException($"Parameter {args[i]} has no matching positional placeholder.");
-                            }
+                                throw ReturnCode.ParseError.Happened(args[i], "Parameter has no matching positional placeholder!");
                             p.SetValue(args[i]);
                         }
                     }
@@ -204,7 +202,7 @@ namespace CommandLineUtils
             }
             ParsedOk = ok;
             if (sb.Length > 0)
-                throw new InvalidOperationException("Missing required arguments: " + sb.ToString());
+                throw ReturnCode.ParseError.Happened(sb.ToString(), "Required parameters are missing!");
         }
 
         public string GetHelpText(int width = 80, string? syntaxPrefix = null)

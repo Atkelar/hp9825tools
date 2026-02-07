@@ -9,10 +9,9 @@ namespace HP9825Utils
         : ProcessBase
     {
         public InvertBitsCommand()
-        {
+        {}
 
-        }
-        protected override async Task<int> RunNow()
+        protected override async Task RunNow()
         {
             Memory mem = Input.MakeBuffer();
 
@@ -24,10 +23,18 @@ namespace HP9825Utils
                 mem[i + inputdata.Offset] = (~mem[i + inputdata.Offset]) & 0xFFFF;
             }
 
-            return await Output.WriteNow(mem, inputdata.ActualFilename, inputdata.Offset, inputdata.WordCount);
+            await Output.WriteNow(mem, inputdata.ActualFilename, inputdata.Offset, inputdata.WordCount);
         }
 
-        protected override void BuildArguments(ParameterBuilder builder)
+        protected override bool BuildReturnCodes(ReturnCodeHandler reg)
+        {
+            
+            Input.RegisterErrors(reg);
+            Output.RegisterErrors(reg);
+            return base.BuildReturnCodes(reg);
+        }
+
+        protected override void BuildArguments(ParameterHandler builder)
         {
             Input = builder.AddOptions<InputFileOptions>();
             Output = builder.AddOptions<OutputFileOptions>("o");

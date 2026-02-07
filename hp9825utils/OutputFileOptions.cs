@@ -31,7 +31,22 @@ namespace HP9825Utils
         public bool Overwrite { get; set; }
 
 
-        public async Task<int> WriteNow(Memory mem, string originalFilename, int defaultOfs, int defaultSize)
+        internal void RegisterErrors(ReturnCodeHandler reg)
+        {
+            Errors = reg.Register<OuptutRelatedErrors>(10);
+        }
+
+        private ReturnCodeGroup<OuptutRelatedErrors>? Errors;
+
+        enum OuptutRelatedErrors
+        {
+            [ReturnCode("Output offset/size mismatch: requested {0} words at {1}, but limits are 0..{2}", HelpMessage = "Happens when the provided output options for offset and/or length don't add up for a valid block.")]
+            OffsetOrSizeProblem=1,
+            [ReturnCode("File {0} already exists. Use Overwrite option to overwrite!", HelpMessage = "Happens when the output file exists, but overwrite was not requested.")]
+            ClobberOutput = 2
+        }
+
+        public async Task WriteNow(Memory mem, string originalFilename, int defaultOfs, int defaultSize)
         {
             int outOfs = Offset;
             int outSize = Size;
@@ -45,8 +60,7 @@ namespace HP9825Utils
                 outSize = defaultSize;
             if (outOfs + outSize > mem.Length || outOfs < 0 || outSize <= 0)
             {
-                Console.WriteLine("Output offset/size mismatch: requested {0} words at {1}, but limits are 0..{2}", outSize, outOfs, mem.Length);
-                return 2;
+                throw Errors!.Happened(OuptutRelatedErrors.OffsetOrSizeProblem, outSize, outOfs, mem.Length);
             }
 
             if (UseHighLowFiles)
@@ -54,11 +68,10 @@ namespace HP9825Utils
                 string org = Path.GetExtension(outFile);
                 string hFile = System.IO.Path.ChangeExtension(outFile, ".out.high" + org);
                 string lFile = System.IO.Path.ChangeExtension(outFile, ".out.low" + org);
-                if ((File.Exists(hFile) || File.Exists(lFile)) && !Overwrite)
-                {
-                    Console.WriteLine("File {0} or {1} already exists. Use Overwrite option to overwrite!", hFile, lFile);
-                    return 3;
-                }
+                if (File.Exists(hFile) && !Overwrite)
+                    throw Errors!.Happened(OuptutRelatedErrors.ClobberOutput, hFile);
+                if (File.Exists(lFile) && !Overwrite)
+                    throw Errors!.Happened(OuptutRelatedErrors.ClobberOutput, lFile);
                 Console.WriteLine("Creating {0} and {1}...", hFile, lFile);
                 using (var bwh = new BinaryWriter(File.Create(hFile)))
                 {
@@ -71,17 +84,13 @@ namespace HP9825Utils
             else
             {
                 if (File.Exists(outFile) && !Overwrite)
-                {
-                    Console.WriteLine("File {0} already exists. Use Overwrite option to overwrite!", outFile);
-                    return 3;
-                }
+                    throw Errors!.Happened(OuptutRelatedErrors.ClobberOutput, outFile);
                 Console.WriteLine("Creating {0}...", outFile);
                 using (var bw = new BinaryWriter(File.Create(outFile)))
                 {
                     mem.Dump16Bit(bw, outOfs, outSize, !UseLittleEndian);
                 }
             }
-            return 0;
         }
     }
 }

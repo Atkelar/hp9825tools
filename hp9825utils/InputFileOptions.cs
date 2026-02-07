@@ -35,7 +35,26 @@ namespace HP9825Utils
             return Memory.MakeMemory(Use16Bit);
         }
 
-        public async Task<(int ReturnCode, int Offset, int WordCount, string ActualFilename)> ReadBuffer(Memory mem)
+        internal void RegisterErrors(ReturnCodeHandler reg)
+        {
+            Errors = reg.Register<InputRelatedErrors>(20);
+        }
+
+        private ReturnCodeGroup<InputRelatedErrors>? Errors;
+
+        enum InputRelatedErrors
+        {
+            [ReturnCode("Input file not found: {0}", HelpMessage = "Happens when the provided input file isn't found in the filesystem.")]
+            FileNotFound=1,
+            [ReturnCode("Input file size invalid: {0}, {1} ({2})", HelpMessage = "Happens when the input file size doesn't add up to expectations.")]
+            SizeProblem=2,
+            [ReturnCode("Range specification invalid. Requested {0}-{1}, valid {2}-{3} ({4})", HelpMessage = "Happens when the input range (offset/length) results in an invalid range.")]
+            RangeProblem=3,
+         
+           
+        }
+
+        public async Task<(int Offset, int WordCount, string ActualFilename)> ReadBuffer(Memory mem)
         {
             string inputfile = Filename;
             if (Path.GetExtension(inputfile).Length == 0)
@@ -43,10 +62,7 @@ namespace HP9825Utils
 
             int ofs = LoadToOffset;
             if (ofs < 0 || ofs >= mem.Length)
-            {
-                Console.WriteLine("Load offset out of range: {0}, 0..{1}", ofs, mem.Length);
-                return (2, 0, 0, string.Empty);
-            }
+                throw Errors!.Happened(InputRelatedErrors.RangeProblem, ofs, 1, 0, mem.Length, "The requested start offset was invalid!");
 
             int size = mem.Length - ofs;    // init with maximum for memory.
             if (UseHighLowFiles)
@@ -56,16 +72,12 @@ namespace HP9825Utils
                 string lFile = System.IO.Path.ChangeExtension(inputfile, ".low" + org);
                 var fil = new FileInfo(lFile);
                 var fih = new FileInfo(hFile);
-                if (!fil.Exists || !fih.Exists)
-                {
-                    Console.WriteLine("Input file {0} or {1} not found!", hFile, lFile);
-                    return (1, 0, 0, string.Empty);
-                }
+                if (!fil.Exists)
+                    throw Errors!.Happened(InputRelatedErrors.FileNotFound, hFile);
+                if (!fih.Exists)
+                    throw Errors!.Happened(InputRelatedErrors.FileNotFound, lFile);
                 if (fil.Length != fih.Length)
-                {
-                    Console.WriteLine("Input files {0} or {1} not the same size!", hFile, lFile);
-                    return (1, 0, 0, string.Empty);
-                }
+                    throw Errors!.Happened(InputRelatedErrors.SizeProblem, hFile, fih.Length, "low/high file sizes don't match!");
                 // number of words...
                 if (LoadSize < 0)
                 {
@@ -75,13 +87,11 @@ namespace HP9825Utils
                 {
                     if (LoadSize == 0 || LoadSize + ofs > mem.Length)
                     {
-                        Console.WriteLine("Size out of range! {0} starting at {1} was requested, memory is from 0..{2}", LoadSize, ofs, mem.Length);
-                        return (2, 0, 0, string.Empty);
+                        throw Errors!.Happened(InputRelatedErrors.RangeProblem, ofs, ofs+LoadSize, 0, mem.Length, "Size parameter invalid");
                     }
                     if (LoadSize > fil.Length)
                     {
-                        Console.WriteLine("File too small for requested size! {0} was requested, file has {1}...", LoadSize, fil.Length);
-                        return (2, 0, 0, string.Empty);
+                        throw Errors!.Happened(InputRelatedErrors.RangeProblem, 0, LoadSize, 0, fil.Length, "The file size was too small for the requesed length!");
                     }
                     size = LoadSize;
                 }
@@ -98,31 +108,19 @@ namespace HP9825Utils
             {
                 var fi = new FileInfo(inputfile);
                 if (!fi.Exists)
-                {
-                    Console.WriteLine("Input file {0} not found!", inputfile);
-                    return (1, 0, 0, string.Empty);
-                }
+                    throw Errors!.Happened(InputRelatedErrors.FileNotFound, inputfile);
                 if (LoadSize < 0)
                 {
                     if ((fi.Length % 2) != 0)
-                    {
-                        Console.WriteLine("Input file wasn't even length; words required!");
-                        return (2, 0, 0, string.Empty);
-                    }
+                        throw Errors!.Happened(InputRelatedErrors.SizeProblem, inputfile, fi.Length, "file not word-aligned!");
                     size = Math.Min(size, (int)fi.Length / 2);
                 }
                 else
                 {
                     if (LoadSize == 0 || LoadSize + ofs > mem.Length)
-                    {
-                        Console.WriteLine("Size out of range! {0} starting at {1} was requested, memory is from 0..{2}", LoadSize, ofs, mem.Length);
-                        return (2, 0, 0, string.Empty);
-                    }
+                        throw Errors!.Happened(InputRelatedErrors.RangeProblem, ofs, ofs+LoadSize, 0, mem.Length, "The requested offset/length doesn't add up.");
                     if (LoadSize * 2 > fi.Length)
-                    {
-                        Console.WriteLine("File too small for requested size! {0} was requested, file has {1} byets ({2} words)...", LoadSize, fi.Length, fi.Length / 2);
-                        return (2, 0, 0, string.Empty);
-                    }
+                        throw Errors!.Happened(InputRelatedErrors.RangeProblem, 0, LoadSize, 0, fi.Length / 2, "The file size was too small for the requesed length!");
                     size = LoadSize;
                 }
                 using (var br = new BinaryReader(File.OpenRead(inputfile)))
@@ -130,7 +128,7 @@ namespace HP9825Utils
                     mem.Load16Bit(br, ofs, size, !UseLittleEndian);
                 }
             }
-            return (0, ofs, size, inputfile);
+            return (ofs, size, inputfile);
         }
     }
 }

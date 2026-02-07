@@ -173,55 +173,81 @@ namespace CommandLineUtils
                 Console.WriteLine(details);
                 Console.WriteLine();
             }
+            details = p.GetReturnCodeHelp(80);
+            if (details != null)
+            {
+                Console.WriteLine("The process will return the following exit codes:");
+                Console.WriteLine();
+                Console.WriteLine(details);
+                Console.WriteLine();
+            }
             return 0;
         }
 
+        /// <summary>
+        /// Runs the program, including any pre-defined parameter parsing.
+        /// </summary>
+        /// <param name="args">The command line args, as recieved by the hosting application.</param>
+        /// <returns>The exit code for the operating system.</returns>
         public async Task<int> Run(string[] args)
         {
-            if (args.Length == 0)
+            try
             {
-                WriteHelpOverview("Command is missing");
-                return -1;
-            }
-            else
-            {
-                var cmd = args[0].Trim();
-                if (IgnoreCase)
-                    cmd = cmd.ToLowerInvariant();
-                if (cmd == "help")  // predefined...
+                if (args.Length == 0)
                 {
-                    if (args.Length > 1)
-                    {
-                        cmd = args[1].Trim();
-                        if (IgnoreCase)
-                            cmd = cmd.ToLowerInvariant();
-                        // help cmd
-                        return ShowDetailedHelpFor(cmd, args.Length > 2 ? args[2] : null);
-                    }
-                    else
-                    {
-                        WriteHelpOverview("Command Listing", true);
-                        return 0;
-                    }
+                    throw ReturnCode.ParseError.Happened("<value not provided>", "Command is missing!");
                 }
                 else
                 {
-                    if (!LongNames.TryGetValue(cmd, out var selected))
+                    var cmd = args[0].Trim();
+                    if (IgnoreCase)
+                        cmd = cmd.ToLowerInvariant();
+                    if (cmd == "help")  // predefined...
                     {
-                        if (!ShortNames.TryGetValue(cmd, out selected))
+                        if (args.Length > 1)
                         {
-                            WriteHelpOverview($"Command '{cmd}' was not found");
-                            return -2;
+                            cmd = args[1].Trim();
+                            if (IgnoreCase)
+                                cmd = cmd.ToLowerInvariant();
+                            // help cmd
+                            return ShowDetailedHelpFor(cmd, args.Length > 2 ? args[2] : null);
+                        }
+                        else
+                        {
+                            WriteHelpOverview("Command Listing", true);
                         }
                     }
-                    // got a command now...
-                    var thisCommand = selected.CreateImplementation(CommandName, IgnoreCase, cmd);
-                    string[] newArgs = new string[args.Length - 1];
-                    Array.Copy(args, 1, newArgs, 0, newArgs.Length);
-                    return await thisCommand.Run(newArgs);
+                    else
+                    {
+                        if (!LongNames.TryGetValue(cmd, out var selected))
+                        {
+                            if (!ShortNames.TryGetValue(cmd, out selected))
+                            {
+                                throw ReturnCode.ParseError.Happened($"Command '{cmd}' was not found");
+                            }
+                        }
+                        // got a command now...
+                        var thisCommand = selected.CreateImplementation(CommandName, IgnoreCase, cmd);
+                        string[] newArgs = new string[args.Length - 1];
+                        Array.Copy(args, 1, newArgs, 0, newArgs.Length);
+                        await thisCommand.Run(newArgs);
+                    }
                 }
             }
-            return -3;
+            catch (ReturnCodeException ex)
+            {
+                if (ex.IsNonError)
+                    Console.WriteLine(ex.Message);
+                if (!ex.IsNonError)
+                    Console.WriteLine(ex.Message);
+                return ex.Code;
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine(ReturnCode.UhandledError.ErrorMessageTemplate, ex.Message);
+                return ReturnCode.UhandledError.Code;
+            }
+            return ReturnCode.Success.Code; 
         }
     }
 }
