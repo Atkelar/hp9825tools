@@ -2,10 +2,12 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO.Pipes;
+using System.Linq;
 using System.Reflection.PortableExecutable;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 namespace CommandLineUtils
 {
@@ -15,7 +17,6 @@ namespace CommandLineUtils
     public abstract class OutputHandlerBase
         : IDisposable
     {
-
         /// <summary>
         /// Display specifier... used to support redirecting stderr and stdout independent of verbose output...
         /// </summary>
@@ -26,8 +27,15 @@ namespace CommandLineUtils
             /// </summary>
             public abstract int? DisplayWidth { get; }
 
+            /// <summary>
+            /// Implementors need to write the provided string to the output media and append a newline character.
+            /// </summary>
+            /// <param name="ouptut">The text to write.</param>
             public abstract void WriteLine(string ouptut);
 
+            /// <summary>
+            /// Flushes the output buffers; makes sure all text written so far lands on whatever media it is going to.
+            /// </summary>
             public virtual void Flush() {}
 
             internal int IndentLevel {get;set;}
@@ -186,30 +194,281 @@ namespace CommandLineUtils
         /// <returns>A table formatter to use to create tabular output!</returns>
         public TableFormatter Table(VerbosityLevel level, Action<ITableBuilder> creator)
         {
-            throw new NotImplementedException();
+            var spec = TargetFor(level);
+            if(spec == null)
+                return new TableFormatter(null, level, Array.Empty<TableColumn>(),false,false,false);
+            var b = new TableBuilder(spec.DisplayWidth, level);
+            creator(b);
+            return b.Make(this);
         }
 
+        private class TableBuilder
+            : ITableBuilder
+        {
+            public TableBuilder(int? width, VerbosityLevel level)
+            {
+                _Width = width;
+                _Level = level;
+            }
+
+            public TableFormatter Make(OutputHandlerBase parent)
+            {
+                // validate columns...
+                if (_Columns.Count==0)
+                    throw new InvalidOperationException("No columns in table!");
+                
+                int minWidth = _Columns.Sum(x=>x.Width ?? x.MinWidth ?? throw new InvalidOleVariantTypeException("Column is dynamic but missing min length"));
+                int maxWidth = _Columns.Sum(x=>x.Width ?? x.MaxWidth ?? throw new InvalidOleVariantTypeException("Column is dynamic but missing max length"));
+                minWidth+=_Columns.Count-1;
+                maxWidth+=_Columns.Count-1;
+
+                if (_Width.HasValue && minWidth > _Width) // found width, but too wide!
+                {
+                    // Truncate to minWidth...
+                    foreach(var item in _Columns)
+                    {
+                        if (!item.Width.HasValue)
+                            item.Width = item.MinWidth;
+                    }
+                    int width = 0;
+                    for(int i=0;i<_Columns.Count;i++)
+                    {
+                        int cWidth = (i==0 ? 0 : 1) + _Columns[i].Width!.Value;
+                        if (width + cWidth > maxWidth)
+                        {
+                            if (width+3 > maxWidth)
+                            {
+                                // we don't even have space for any part past the separapor, trim and exit.
+                                _Columns.RemoveRange(i, _Columns.Count - i);
+                                break;
+                            }
+                            else
+                            {
+                                // truncate column...
+                                _Columns[i].Width = (_Width.Value - (width + 2));
+                                _Columns[i].ShowTruncate=true;
+                                // trim rest...
+                                if (i+1 < _Columns.Count)
+                                    _Columns.RemoveRange(i+1, _Columns.Count - (i + 1));
+                                break;
+                            }
+                        }
+                        else
+                            width+=cWidth;
+                    }
+                }
+                else
+                {
+                    if (minWidth != maxWidth)
+                    {
+                        // we need to stretch something...
+                        if (_Width.HasValue &&  maxWidth>_Width.Value )
+                            maxWidth = _Width.Value;
+                        // we have between min and max characters to add to all the dynamic columns. Proportionally stretch them, based on avg. possible width.
+
+                        double total = maxWidth-minWidth;   // got total columns to distribute.
+
+                        var avgWidths = _Columns.Select(x=>x.Width.HasValue ? 0d : ((double)x.MinWidth!.Value + (double)x.MaxWidth!.Value) / 2d).ToArray();
+                        var sum =avgWidths.Sum(x=>x);
+                        for(int i=0;i<avgWidths.Length;i++)
+                        {
+                            avgWidths[i]/=sum;
+                        }
+                        int? lastColumn = null;
+                        for(int i=0;i<avgWidths.Length;i++)
+                        {
+                            if(_Columns[i].Width.HasValue)
+                                continue;
+                            if (avgWidths[i]== 0)
+                                _Columns[i].Width = _Columns[i].MinWidth;
+                            else
+                            {
+                                double give = total * avgWidths[i];
+                                int given = (int)Math.Floor(give);
+                                _Columns[i].Width=_Columns[i].MinWidth!.Value + given;
+                                total -= give;
+                                lastColumn = i;
+                            }
+                        }
+                        if (total > 1 && lastColumn.HasValue)   // account for roundings...
+                            _Columns[lastColumn.Value].Width += (int)Math.Floor(total);
+                    }
+                }
+
+                parent.EnsureNewLine(_Level);
+                
+                return new TableFormatter(parent, _Level, _Columns.ToArray(), Ticks,SepHead, SepFoot)
+                {
+                    RowCounter = RowCount
+                };
+            }
+
+            private List<TableColumn> _Columns = new List<TableColumn>();
+            private int? _Width;
+            private string? RowCount;
+            private bool SepHead, SepFoot, Ticks;
+            private VerbosityLevel _Level;
+            public ITableBuilder Column(int width,  Action<ITableColumnBuilder> build)
+            {
+                var b = new TableColumnBuilder(width);
+                build(b);
+                _Columns.Add(b.Make());
+                return this;
+            }
+
+            public ITableBuilder Column(int min, int max,  Action<ITableColumnBuilder> build)
+            {
+                var b = new TableColumnBuilder(min, max);
+                build(b);
+                _Columns.Add(b.Make());
+                return this;
+            }
+
+            public ITableBuilder Separators(bool headerSeparator, bool footerSeparator, bool useTicks = false)
+            {
+                SepFoot = footerSeparator;
+                SepHead = headerSeparator;
+                Ticks = useTicks;
+                return this;
+            }
+
+            public ITableBuilder RowCountTemplate(string template)
+            {
+                RowCount = template;
+                return this;    
+            }
+        }
+
+        private class TableColumnBuilder
+            : ITableColumnBuilder
+        {
+            public TableColumnBuilder(int w)
+            {
+                col.Width=w;
+            }
+            public TableColumnBuilder(int min,int max)
+            {
+                col.MinWidth=min;
+                col.MaxWidth=max;
+            }
+            private TableColumn col = new TableColumn()
+            {
+                Align = HorizontalAlignment.Left,
+                Trimming = TextTrimming.Beginning
+            };
+            public ITableColumnBuilder Align(HorizontalAlignment align, TextTrimming trim = TextTrimming.Beginning)
+            {
+                col.Align = align;
+                col.Trimming = trim;
+                return this;
+            }
+
+            public ITableColumnBuilder FooterFrom(Func<object?> source)
+            {
+                col.FooterCallback = source;
+                return this;
+            }
+
+            public ITableColumnBuilder Format(string formatString)
+            {
+                col.FormatString = formatString;
+                return this;
+            }
+
+            public ITableColumnBuilder Head(string header)
+            {
+                col.Header = header;
+                return this;
+            }
+
+
+            internal TableColumn Make()
+            {
+                return col;
+            }
+        }
+
+        /// <summary>
+        /// Creates a new table definitin.
+        /// </summary>
         public interface ITableBuilder
         {
-            ITableBuilder Column(Action<ITableColumnBuilder> build);
+            /// <summary>
+            /// Adds a column to a table.
+            /// </summary>
+            /// <param name="width">The width in characters.</param>
+            /// <param name="build">The column defnition.</param>
+            /// <returns>The builder for chained calls.</returns>
+            ITableBuilder Column(int width, Action<ITableColumnBuilder> build);
+            /// <summary>
+            /// Adds a column to a table.
+            /// </summary>
+            /// <param name="min">Minimum width in chacacters.</param>
+            /// <param name="max">Maximum width in characters.</param>
+            /// <param name="build">The column defnition.</param>
+            /// <returns>The builder for chained calls.</returns>
+            ITableBuilder Column(int min, int max, Action<ITableColumnBuilder> build);
+            /// <summary>
+            /// Enable header or footer separator for the table.
+            /// </summary>
+            /// <param name="headerSeparator">True to print a dashed line between the headline and the body.</param>
+            /// <param name="footerSeparator">True to print a dashed line between the body and footer of the table.</param>
+            /// <param name="useTicks">True to add + marks between columns.</param>
+            /// <returns>The builder for chained calls.</returns>
+            ITableBuilder Separators(bool headerSeparator, bool footerSeparator, bool useTicks = false);
+
+            /// <summary>
+            /// Sets a template string (with placeholder {0}) for a "summary row" to show number of rows in a line after the table.
+            /// </summary>
+            /// <param name="template">The template string.</param>
+            /// <returns>The builder for chained calls.</returns>
+            ITableBuilder RowCountTemplate(string template);
+
         }
 
+        /// <summary>
+        /// Creates a single table column.
+        /// </summary>
         public interface ITableColumnBuilder
         {
-            ITableColumnBuilder Width(int width);
-            ITableColumnBuilder Width(int min, int max);
+            /// <summary>
+            /// Sets the alignment and trimming mode for the column. Default would be left aligned, end trimming.
+            /// </summary>
+            /// <param name="align">The alignment.</param>
+            /// <param name="trim">The trimming mode.</param>
+            /// <returns>The builder for chaining calls.</returns>
             ITableColumnBuilder Align(HorizontalAlignment align, TextTrimming trim = TextTrimming.Beginning);
+            /// <summary>
+            /// Sets an optional header string.
+            /// </summary>
+            /// <param name="header">The header text.</param>
+            /// <returns>The builder for chaining calls.</returns>
             ITableColumnBuilder Head(string header);
+            /// <summary>
+            /// Sets a format string for formatting <see cref="IFormattable"/>  based objects in the column.
+            /// </summary>
+            /// <param name="formatString">The format string.</param>
+            /// <returns>The builder for chaining calls.</returns>
             ITableColumnBuilder Format(string formatString);
+            /// <summary>
+            /// Sets a callback to fetch a footer value for the column.
+            /// </summary>
+            /// <param name="source">A function that will be called when the table is done. Any value returned here will be added as a footer line.</param>
+            /// <returns>The builder for chaining calls.</returns>
             ITableColumnBuilder FooterFrom(Func<object?> source);
         }
 
-        internal struct TableColumn
+        internal class TableColumn
         {
             public string? FormatString { get; set; }
-            public int Width { get; set; }
+            public int? Width { get; set; }
+            public int? MinWidth {get;set;}
+            public int? MaxWidth {get;set;}
             public HorizontalAlignment Align { get; set; }
             public TextTrimming Trimming {get; set;}
+            public Func<object?>? FooterCallback { get; set; }
+            public string? Header {get;set;}
+            public bool ShowTruncate { get; internal set; }
         }
 
         /// <summary>
@@ -218,12 +477,39 @@ namespace CommandLineUtils
         public class TableFormatter
             : IDisposable
         {
-            internal TableFormatter(OutputHandlerBase parent, VerbosityLevel level, TableColumn[] columns)
+            internal TableFormatter(OutputHandlerBase? parent, VerbosityLevel level, TableColumn[] columns, bool useTicks, bool headSep, bool footSep)
             {
                 _parent = parent;
                 _Columns = columns;
                 _Level = level;
+                HeaderSeparator = headSep;
+                FooterSeparator = footSep;
+                SeparatorTicks = useTicks;
+
+                var t = _parent?.TargetFor(level);
+                if(t == null || columns.Length==0)
+                    _parent = null; // we just default to null-out
+                else
+                {
+                    if (t.IsInTable)
+                        throw new InvalidOperationException("Nested tables are not supported!");
+                    t.IsInTable = true;
+                    if (_Columns.Any(x=>x.Header != null))
+                    {
+                        Line(t, _Columns.Select(x=>x.Header).ToArray());
+                        RowCount=0; // start over.
+                        if(headSep)
+                            PrintSeparatorRow(t);
+                    }
+                }
             }
+
+            internal bool HeaderSeparator {get;set;}
+            internal bool FooterSeparator {get;set;}
+            internal bool SeparatorTicks {get;set;}
+            internal string? RowCounter {get;set;}
+           
+            int RowCount = 0;
 
             OutputHandlerBase? _parent;
             private readonly TableColumn[] _Columns;
@@ -235,10 +521,148 @@ namespace CommandLineUtils
                 {
                     // close table...
                     //_parent =;
+                    var t = _parent.TargetFor(_Level);
+                    if (t!=null)
+                    {
+                        // visually close table...
+                        int count = RowCount;
+                        if (_Columns.Any(x=>x.FooterCallback != null))
+                        {
+                            // we need a footer...
+                            if (this.FooterSeparator)
+                            {
+                                PrintSeparatorRow(t);
+                            }
+                            Line(t, _Columns.Select(x=>x.FooterCallback?.Invoke()).ToArray());
+                        }
+                        if (RowCounter != null)
+                        {
+                            t.WriteLine(string.Format(RowCounter, count));
+                        }
+                        t.IsInTable = false;
+                    }
                 }
                 _parent = null;
-            }        
+            }
+
+
+
+            private void PrintSeparatorRow(DisplaySpec t)
+            {
+                StringBuilder sb= new StringBuilder();
+                foreach(var c in _Columns)
+                {
+                    if(sb.Length>0)
+                        sb.Append(SeparatorTicks ? '+':'-');
+                    sb.Append('-', c.Width!.Value);
+                }
+                t.WriteLine(sb.ToString());
+            }
+
+            private void Line(DisplaySpec target, params object?[] columns)
+            {
+                StringBuilder sb= new StringBuilder();
+                bool lastWasTruncated = false;
+                int i = 0;
+                object?[]? overflow=null;
+                foreach(var c in _Columns)
+                {
+                    if(sb.Length>0)
+                        sb.Append(lastWasTruncated ? '…' : ' ');
+                    string vText;
+                    if (i< columns.Length && columns[i] != null)
+                    {
+                        if (columns[i] is IFormattable fmt && c.FormatString != null)
+                        {
+                            vText = fmt.ToString(c.FormatString, null);
+                        }
+                        else
+                        {
+                            vText = columns[i]?.ToString() ?? string.Empty;
+                        }
+                    }
+                    else    
+                        vText = string.Empty;
+                    if (vText.Length > c.Width!.Value)
+                    {
+                        int len = c.Width!.Value;
+                        // handle trimming...
+                        switch(c.Trimming)
+                        {
+                            case TextTrimming.End:
+                                vText = vText.Substring(0, len);
+                                lastWasTruncated = true;
+                                break;
+                            case TextTrimming.Beginning:
+                                vText = vText.Substring(vText.Length - len);
+                                lastWasTruncated = true;
+                                break;
+                            case TextTrimming.Both:
+                                int beg = len / 2;
+                                len = len - beg;
+                                vText = vText.Substring(beg, len);
+                                lastWasTruncated = true;
+                                break;
+                            case TextTrimming.NoTrim:
+                                // ugh... overlflow.
+                                overflow ??= new object?[columns.Length];
+                                overflow[i] = vText.Substring(len);
+                                vText = vText.Substring(0, len);
+                                break;
+                        }
+                    }
+                    if (vText.Length < c.Width.Value)
+                    {
+                        int len = c.Width!.Value;
+                        // handle padding.
+                        switch(c.Align)
+                        {
+                            case HorizontalAlignment.Left:
+                                sb.Append(vText);
+                                sb.Append(' ', len - vText.Length);
+                                break;
+                            case HorizontalAlignment.Right:
+                                sb.Append(' ', len - vText.Length);
+                                sb.Append(vText);
+                                break;
+                            case HorizontalAlignment.Center:
+                                int beg = (len - vText.Length) / 2;
+                                len -= beg;
+                                sb.Append(' ', beg);
+                                sb.Append(vText);
+                                sb.Append(' ', len - vText.Length);
+                                break;
+                        }
+                    }
+                    else    // exact length.
+                        sb.Append(vText);
+                    i++;
+                }
+
+                if (_Columns[_Columns.Length-1].ShowTruncate && lastWasTruncated)  
+                {
+                    sb.Append('…');
+                }
+
+                target.WriteLine(sb.ToString());
+            }
+
+            /// <summary>
+            /// Print a single line in a table.
+            /// </summary>
+            /// <param name="columns">The valus for the columns.</param>
+            public void Line(params object?[] columns)
+            {
+                RowCount++;
+                if(_parent!=null && _Columns.Length>0)
+                { 
+                    var t = _parent.TargetFor(_Level);
+                    if (t != null)
+                        Line(t, columns);
+                }
+            }
         }
+
 
         private Dictionary<VerbosityLevel, StringBuilder> _LineBuffers = new Dictionary<VerbosityLevel, StringBuilder>();
 

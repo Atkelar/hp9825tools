@@ -40,10 +40,12 @@ namespace CommandLineUtils
         /// </summary>
         protected abstract Task RunNow();
 
+
+
         public void WriteLine(VerbosityLevel level, SplitMode split, string? message)
         {
-            if (_Output != null)
-                _Output.WriteLine(level, split, message);
+            if (Out != null)
+                Out.WriteLine(level, split, message);
             else
             {
                 switch (level)
@@ -60,8 +62,8 @@ namespace CommandLineUtils
 
         public void Write(VerbosityLevel level, SplitMode split, string message)
         {
-            if (_Output != null)
-                _Output.Write(level, split, message);
+            if (Out != null)
+                Out.Write(level, split, message);
             else
             {
                 switch (level)
@@ -78,10 +80,10 @@ namespace CommandLineUtils
 
         internal void SetOutput(OutputHandlerBase output)
         {
-            _Output = output;
+            Out = output;
         }
 
-        private OutputHandlerBase? _Output;
+        protected OutputHandlerBase? Out {get;private set;}
        
 
 
@@ -144,7 +146,7 @@ namespace CommandLineUtils
         /// <returns>The formatted string, or null if there are no parameters defined.</returns>
         public void WriteHelpText(OutputHandlerBase? output)
         {
-            output ??= _Output;
+            output ??= Out;
             if (_Parameters != null && output != null)
             {
                 _Parameters.HelpRequested = string.Empty;

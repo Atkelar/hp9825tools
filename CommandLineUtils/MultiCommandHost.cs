@@ -335,6 +335,10 @@ namespace CommandLineUtils
         /// <param name="isDisposing">True if the call came from the explicit dispose, false if it came from a destructor.</param>
         protected virtual void Dispose(bool isDisposing)
         {
+            if (isDisposing)
+            {
+                Output?.Dispose();
+            }
         }
         /// <summary>
         /// Implements <see cref="IDisposable"/> 

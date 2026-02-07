@@ -1,5 +1,7 @@
 using CommandLineUtils;
 using HP9825CPU;
+using System.ComponentModel;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
 namespace HP9825Utils
@@ -13,9 +15,9 @@ namespace HP9825Utils
 
         protected override async Task RunNow()
         {
-            Memory mem = Input.MakeBuffer();
+            Memory mem = InOptions.MakeBuffer();
 
-            var inputdata = await Input.ReadBuffer(mem);
+            var inputdata = await InOptions.ReadBuffer(mem);
 
             // we loaded "size" words to "ofs"; start inverting!
             for (int i = 0; i < inputdata.WordCount; i++)
@@ -23,25 +25,34 @@ namespace HP9825Utils
                 mem[i + inputdata.Offset] = (~mem[i + inputdata.Offset]) & 0xFFFF;
             }
 
-            await Output.WriteNow(mem, inputdata.ActualFilename, inputdata.Offset, inputdata.WordCount);
+            using(var t = Out.Table(VerbosityLevel.Normal, 
+                x=> x.RowCountTemplate("{0} rows").Separators(true,true, true)
+                    .Column(5, c=>c.Head("Test").Format("000").Align(HorizontalAlignment.Right, TextTrimming.End))
+                    .Column(3, 10, c=>c.Align(HorizontalAlignment.Center))))
+            {
+                t.Line(12,3,4,5);
+                t.Line(12);
+            }
+
+            await OutOptions.WriteNow(mem, inputdata.ActualFilename, inputdata.Offset, inputdata.WordCount);
         }
 
         protected override bool BuildReturnCodes(ReturnCodeHandler reg)
         {
 
-            Input.RegisterErrors(reg);
-            Output.RegisterErrors(reg);
+            InOptions.RegisterErrors(reg);
+            OutOptions.RegisterErrors(reg);
             return base.BuildReturnCodes(reg);
         }
 
         protected override void BuildArguments(ParameterHandler builder)
         {
-            Input = builder.AddOptions<InputFileOptions>();
-            Output = builder.AddOptions<OutputFileOptions>("o");
+            InOptions = builder.AddOptions<InputFileOptions>();
+            OutOptions = builder.AddOptions<OutputFileOptions>("o");
         }
 
-        public InputFileOptions Input { get; set; }
-        public OutputFileOptions Output { get; set; }
+        public InputFileOptions InOptions { get; set; }
+        public OutputFileOptions OutOptions { get; set; }
 
         public override void WriteExtendedHelp(OutputHandlerBase output, string? page)
         {
