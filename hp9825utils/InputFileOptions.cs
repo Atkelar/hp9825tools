@@ -24,10 +24,10 @@ namespace HP9825Utils
         [Argument("le", "LittleEndian", HelpText = "When specified, the input file will be read as little endian. Normally big endian is used for 16-bit binaries. No effect when UseHighLow is also used.")]
         public bool UseLittleEndian { get; set; }
 
-        [Argument("ofs", "Offset", HelpText = "The input file is loaded into a 'working memory'. Normally, it is loaded to address 0 in that, but it can be moved to any (word!) offset here.", DefaultValue = "0")]
+        [Argument("o", "Offset", HelpText = "The input file is loaded into a 'working memory'. Normally, it is loaded to address 0 in that, but it can be moved to any (word!) offset here.", DefaultValue = "0")]
         public int LoadToOffset { get; set; } = 0;
 
-        [Argument("sz", "Size", HelpText = "The number of bytes to read; when not specified, reads until either the file or the working memory is exhausted. When specified, will be range checked.")]
+        [Argument("s", "Size", HelpText = "The number of bytes to read; when not specified, reads until either the file or the working memory is exhausted. When specified, will be range checked.")]
         public int LoadSize { get; set; } = -1;
 
         public Memory MakeBuffer()

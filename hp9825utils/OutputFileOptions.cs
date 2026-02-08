@@ -12,7 +12,7 @@ namespace HP9825Utils
         {
         }
 
-        [Argument("f", "FIle", HelpText = "The output file name (or base filename) to use. Defaults to .out.bin extension, uses the same name as the input when not specified.", Positional = 2)]
+        [Argument("f", "File", HelpText = "The output file name (or base filename) to use. Defaults to .out.bin extension, uses the same name as the input when not specified.", Positional = 2)]
         public string Filename { get; set; }
 
         [Argument("o", "Offset", HelpText = "The offset in the working memory to start writing; Uses the same as the input offset if not provided.")]
@@ -43,16 +43,34 @@ namespace HP9825Utils
             [ReturnCode("Output offset/size mismatch: requested {0} words at {1}, but limits are 0..{2}", HelpMessage = "Happens when the provided output options for offset and/or length don't add up for a valid block.")]
             OffsetOrSizeProblem=1,
             [ReturnCode("File {0} already exists. Use Overwrite option to overwrite!", HelpMessage = "Happens when the output file exists, but overwrite was not requested.")]
-            ClobberOutput = 2
+            ClobberOutput = 2,
+            [ReturnCode("Cannot derive filename for output. Check input parameter settings.", HelpMessage = "Happens when the output file name isn't provided and there is no base name available.")]
+            NoFilename = 3
         }
 
-        public async Task WriteNow(Memory mem, string originalFilename, int defaultOfs, int defaultSize)
+        public async Task WriteNow(Memory mem, string? originalFilename, int defaultOfs, int defaultSize, string? deriveSuffix = null, string defaultExtension = ".bin")
         {
             int outOfs = Offset;
             int outSize = Size;
             string outFile = Filename;
             if (string.IsNullOrWhiteSpace(outFile))
-                outFile = Path.ChangeExtension(originalFilename, ".out.bin");
+            {
+                if (originalFilename == null)
+                    throw Errors!.Happened(OuptutRelatedErrors.NoFilename);
+                string org = Path.GetExtension(originalFilename);
+                if (string.IsNullOrWhiteSpace(org))
+                    org = defaultExtension;
+                if (deriveSuffix != null)
+                    outFile = Path.ChangeExtension(originalFilename, $".{deriveSuffix}{org}");
+                else
+                    outFile = Path.ChangeExtension(originalFilename, org);
+            }
+            else
+            {
+                string org = Path.GetExtension(outFile);
+                if (string.IsNullOrWhiteSpace(org))
+                    outFile = Path.ChangeExtension(outFile, defaultExtension);
+            }
 
             if (outOfs < 0)
                 outOfs = defaultOfs;
@@ -66,8 +84,8 @@ namespace HP9825Utils
             if (UseHighLowFiles)
             {
                 string org = Path.GetExtension(outFile);
-                string hFile = System.IO.Path.ChangeExtension(outFile, ".out.high" + org);
-                string lFile = System.IO.Path.ChangeExtension(outFile, ".out.low" + org);
+                string hFile = System.IO.Path.ChangeExtension(outFile, ".high" + org);
+                string lFile = System.IO.Path.ChangeExtension(outFile, ".low" + org);
                 if (File.Exists(hFile) && !Overwrite)
                     throw Errors!.Happened(OuptutRelatedErrors.ClobberOutput, hFile);
                 if (File.Exists(lFile) && !Overwrite)

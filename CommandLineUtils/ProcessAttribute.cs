@@ -17,8 +17,8 @@ namespace CommandLineUtils
             LongName = longName;
         }
 
-        public string LongName { get; set; }
-        public string? ShortName { get; set; }
+        public string LongName { get; private set; }
+        public string? ShortName { get; private set; }
         public string? HelpMessage { get; set; }
     }
 }

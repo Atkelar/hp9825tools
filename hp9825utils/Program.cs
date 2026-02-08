@@ -13,6 +13,8 @@ namespace HP9825Utils
                 host.SetupBanner<Program>("9825 CPU Tools", "Atkelar", 2026);
 
                 host.Register<InvertBitsCommand>();
+                host.Register<CreateImageCommand>();
+                host.Register<MergeIntoCommand>();
 
                 return await host.Run(args);
             }
