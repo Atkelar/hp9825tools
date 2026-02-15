@@ -395,6 +395,14 @@ namespace HP9825CPU
 
                             line = line.Substring(1).Trim();
                         }
+                        else
+                        {
+                            if (su.Value.DefaultsToSet)
+                            {
+                                // uh-oh... special case...
+                                opCodeBase |= su.Value.Mask;
+                            }
+                        }
                     }
                     result = AssemblyLine.FromInstruction(from, baseAddress.Value, opCodeBase, exp, mnemonic, operand, suffix, label, line);
                 }

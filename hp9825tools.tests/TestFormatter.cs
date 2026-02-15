@@ -17,7 +17,7 @@ public class TestFormatter
         var p = new ListingPrinter(opts: fmt);
         cl.CreateOutput(p);
 
-        Assert.That(p.ToString(), Is.EqualTo("00001000               * TESTING?\n"));
+        Assert.That(p.ToString(), Is.EqualTo("00001000               * TESTING?\n\n\n"));
     }
 
     [Test]
@@ -28,6 +28,6 @@ public class TestFormatter
         var p = new ListingPrinter(opts: fmt);
         cl.CreateOutput(p);
 
-        Assert.That(p.ToString(), Is.EqualTo("* TESTING?\n"));
+        Assert.That(p.ToString(), Is.EqualTo("* TESTING?\n\n\n"));
     }
 }

@@ -1,4 +1,6 @@
-﻿namespace HP9825CPU
+﻿using System.ComponentModel;
+
+namespace HP9825CPU
 {
 
     internal class CpuConstants
@@ -30,6 +32,67 @@
         public static readonly MnemonicUpdateInfo SetOrClearMnemonicUpdate = new MnemonicUpdateInfo(MCSetOrClear, 'S', 'C');
         public static readonly MnemonicUpdateInfo ClearOrSetMnemonicUpdate = new MnemonicUpdateInfo(MCSetOrClear, 'C', 'S');
         public static readonly MnemonicUpdateInfo DirectOrIndirectMnemonicUpdate = new MnemonicUpdateInfo(MCDirectOrIndirect, '\u0000', 'I');
+
+        /// <summary>
+        /// Register masks contain the valid bitmasks for write access.
+        /// </summary>
+        public static readonly int[] RegisterMasks15 = 
+        [
+            0xFFFF,
+            0xFFFF,
+            0x7FFF,
+            0x7FFF,
+            0xFFFF,
+            0xFFFF,
+            0xFFFF,
+            0xFFFF,
+            0xFFF0, // IV
+            0x000F, // PA
+            0xFFFF,
+            0xC00F, // DMAPA
+            0xFFFF,
+            0xFFFF,
+            0xFFFF,
+            0xFFFF,
+            0,      // AR2?
+            0,
+            0,
+            0,
+            0x000F,
+            0,      // X?
+            0,
+            0,
+            0,0,0,0,0,0,0,0 // unassigned
+        ];
+
+        public static readonly int[] RegisterMasks16 = 
+        [
+            0xFFFF,
+            0xFFFF,
+            0xFFFF,
+            0xFFFF,
+            0xFFFF,
+            0xFFFF,
+            0xFFFF,
+            0xFFFF,
+            0xFFF0, // IV
+            0x000F, // PA
+            0xFFFF,
+            0xC00F, // DMAPA
+            0xFFFF,
+            0xFFFF,
+            0xFFFF,
+            0xFFFF,
+            0,      // AR2?
+            0,
+            0,
+            0,
+            0x000F,
+            0,      // X?
+            0,
+            0,
+            0,0,0,0,0,0,0,0 // unassigned
+        ];
 
         // Register names are literal, except when they contain "[]"; these names are there 
         // to facilitate best-effort decoding of invalid instructions but will yield assembly errors.
@@ -92,7 +155,7 @@
                 {
                     Updates = new MnemonicUpdateSpec[] {
                         new MnemonicUpdateSpec(0b0_000_100_000_000_000, WordByteMnemonicUpdate),
-                        new MnemonicUpdateSpec(0b0_000_000_000_010_000, CorDMnemonicUpdate),
+                        new MnemonicUpdateSpec(0b0_000_000_000_001_000, CorDMnemonicUpdate),
                         new MnemonicUpdateSpec(0b0_000_000_010_000_000, IncrementDecrementMnemonicUpdate, true)
                     }
                 },
@@ -100,8 +163,8 @@
                 {
                     Updates = new MnemonicUpdateSpec[] {
                         new MnemonicUpdateSpec(0b0_000_100_000_000_000, WordByteMnemonicUpdate),
-                        new MnemonicUpdateSpec(0b0_000_000_000_010_000, CorDMnemonicUpdate),
-                        new MnemonicUpdateSpec(0b0_000_000_010_000_000, IncrementDecrementMnemonicUpdate, true)
+                        new MnemonicUpdateSpec(0b0_000_000_000_001_000, CorDMnemonicUpdate),
+                        new MnemonicUpdateSpec(0b0_000_000_010_000_000, IncrementDecrementMnemonicUpdate, true, true)   // withdraw defaults to "decrement"..
                     }
                 },
             new CmdStructure(0b0_111_000_101_000_000, MaskAll, "CBU", true),
@@ -117,6 +180,9 @@
             new CmdStructure(0b0_111_000_100_000_000, MaskAll, "SDO", true),
             // BPC main command structure....
             new CmdStructure(0b0_000_000_000_000_000, MaskAll, "NOP"), // NOP is actually a LDA A - but decodes first as NOP for readability.
+            new CmdStructure(0b1_111_000_101_000_111, MaskAll, "CLA"), // CLA is actually a SAR 16 - but decodes first for readability.
+            new CmdStructure(0b1_111_100_101_000_111, MaskAll, "CLB"), // CLB is actually a SBR 16 - but decodes first for readability.
+
             new CmdStructure(0b1_111_000_111_000_000, 0b1_111_011_111_110_000, $"R{MCAorB}R", OperandType.NValue, MaskLower4)
                 {
                     Updates = new MnemonicUpdateSpec[] {

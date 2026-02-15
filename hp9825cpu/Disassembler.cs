@@ -4,7 +4,20 @@ namespace HP9825CPU
 {
     public class Disassembler
     {
-        public static AssemblyLine Disassemble(int opCode, int baseAddress, string? label = null,  string? comment=null)
+
+        public static int BasePattern(int opCode)
+        {
+            foreach (var m in CpuConstants.Commands)
+            {
+                if ((opCode & m.ValueMask) == m.Value)
+                {
+                    return m.Value;
+                }
+            }
+            return -1;
+        }
+
+        public static AssemblyLine Disassemble(int opCode, int baseAddress, string? label = null,  string? comment=null, bool includeDefaults = false)
         {
             foreach (var m in CpuConstants.Commands)
             {
@@ -26,7 +39,13 @@ namespace HP9825CPU
                                 if (use != '\u0000')    // it's a non-empty addition...
                                 {
                                     if (u.IsSuffixUpdate)
-                                        suffix = use.ToString();
+                                    {
+                                        if (includeDefaults)
+                                            suffix = use.ToString();
+                                        else
+                                            if (!((u.DefaultsToSet && isNonZero) || (!u.DefaultsToSet && !isNonZero)))  // set only if we have a non-default.
+                                                suffix = use.ToString();
+                                    }
                                     else
                                         str = str.Replace(u.What.Placeholder, use);
                                 }

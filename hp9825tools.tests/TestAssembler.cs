@@ -35,6 +35,16 @@ namespace hp9825tools.tests
         }
 
         [Test]
+        public void TestStackOperations()
+        {
+            // opcode: 5 => LDA R5
+            var cl = Assembler.Parse(SourceLineRef.Unknown, "  WWC A,I", null, 7);
+            var memory = HP9825CPU.Memory.MakeMemory(false);
+            cl.ApplyTo(memory);
+            Assert.That(memory[7], Is.EqualTo(32782));
+        }
+
+        [Test]
         public void TestLoadAddress()
         {
             var mgr = new LabelManager();

@@ -4,7 +4,7 @@ using System.Linq;
 namespace HP9825CPU
 {
 
-    struct CmdStructure
+    internal struct CmdStructure
     {
         public CmdStructure(int v, int m, string mn, OperandType ot, int om)
             : this(v, m, mn)

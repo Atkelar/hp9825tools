@@ -1,0 +1,21 @@
+namespace CommandLineUtils.Visuals
+{
+    public static class MessageCodes
+    {
+        /// <summary>
+        /// Quit -> Request to terminate the application. The program can react by cancelling the operation. If the "quit" message is not cancelled during event handling, the <see cref="MessageExit"/> will follow.
+        /// </summary>
+        public const string MessageQuit = "quit";
+
+        /// <summary>
+        /// Exit -> Terminate the application. This event doesn't support cancellation.
+        /// </summary>
+        public const string MessageExit = "exit";
+
+        /// <summary>
+        /// Sends a "we need to repaint somethign" message to the application.
+        /// </summary>
+        public const string MessagePaint = "paint";
+
+    }
+}

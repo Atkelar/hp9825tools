@@ -1,22 +1,68 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace HP9825CPU
 {
+    /// <summary>
+    /// Represents a single line in assembler code - can be comment only, a CPU instruction, data defintion, preprocessor directive...
+    /// </summary>
     public abstract class AssemblyLine
     {
+        /// <summary>
+        /// The memory address for this instruction/data item if known.
+        /// </summary>
         public int? Address { get; set; }
 
+        /// <summary>
+        /// The comment that goes with this line.
+        /// </summary>
         public string? Comment { get; set; }
 
+        /// <summary>
+        /// The label that was defined in this line, thus associated with the <see cref="Address"/>.
+        /// </summary>
         public string? Label { get; set; }
+
+        /// <summary>
+        /// The original source file and line.
+        /// </summary>
         public SourceLineRef Source { get; set; }
 
+        /// <summary>
+        /// True to indicate that this line can be repeated with a preceding "REP" instruction.
+        /// </summary>
         public bool IsRepeatable { get; protected set; } = false;
+        
+        /// <summary>
+        /// True to indicate that this line has been created from a macro (like "REP").
+        /// </summary>
         public bool IsFromMacro { get; set; }
 
-        public abstract void PrintBeautified(System.IO.TextWriter target);
+        /// <summary>
+        /// Prints the source code line in a "normalized" way. Do NOT add newline at the end!
+        /// </summary>
+        /// <param name="target">The receiver of the line.</param>
+        public abstract string Beautified();
+        
+        /// <summary>
+        /// Writes the source code line in a "normalized" way.
+        /// </summary>
+        /// <param name="target"></param>
+        public void PrintBeautified(System.IO.TextWriter target)
+        {
+            target.WriteLine(Beautified());
+        }
+
+        /// <summary>
+        /// Gets the line in a normalized way.
+        /// </summary>
+        /// <returns>The source line to ready to show.</returns>
+        public override string ToString()
+        {
+            return Beautified();
+        }
 
         protected AssemblyLine(SourceLineRef from, int? address, string? comment, string? label)
         {
@@ -135,10 +181,11 @@ namespace HP9825CPU
                 target.SetHeadline(Header);
             }
 
-            public override void PrintBeautified(System.IO.TextWriter target)
+            public override string Beautified()
             {
-                target.WriteLine(FormatCodeLine(null, "HDR", Header, null, null));
+                return FormatCodeLine(null, "HDR", Header, null, null);
             }
+
         }
 
         public class AssemblySpcLine
@@ -159,11 +206,10 @@ namespace HP9825CPU
                 target.PrintSourceLine(Address, null, null, "SPC", Expression, Comment, true, IsFromMacro);
                 target.PrintEmptyLines(Count);
             }
-            public override void PrintBeautified(System.IO.TextWriter target)
+            public override string Beautified()
             {
-                target.WriteLine(FormatCodeLine(null, "SPC", Expression, null, Comment));
+                return FormatCodeLine(null, "SPC", Expression, null, Comment);
             }
-
         }
 
 
@@ -201,9 +247,10 @@ namespace HP9825CPU
                 }
                 target.PrintSourceLine(Address, null, Label, Mnemonic, null, Comment, false, IsFromMacro);
             }
-            public override void PrintBeautified(System.IO.TextWriter target)
+
+            public override string Beautified()
             {
-                target.WriteLine(FormatCodeLine(Label, Mnemonic, null, null, Comment));
+                return FormatCodeLine(Label, Mnemonic, null, null, Comment);
             }
         }
 
@@ -260,10 +307,11 @@ namespace HP9825CPU
                 }
             }
 
-            public override void PrintBeautified(System.IO.TextWriter target)
+            public override string Beautified()
             {
-                target.WriteLine(FormatCodeLine(Label, "ASC", string.Concat(NExpression, ",", Ascii), null, Comment));
+                return FormatCodeLine(Label, "ASC", string.Concat(NExpression, ",", Ascii), null, Comment);
             }
+
         }
 
 
@@ -316,9 +364,10 @@ namespace HP9825CPU
             {
                 target.PrintSourceLine(Address, Value, Label, "EQU", Expression, Comment, false, IsFromMacro);
             }
-            public override void PrintBeautified(System.IO.TextWriter target)
+
+            public override string Beautified()
             {
-                target.WriteLine(FormatCodeLine(Label, "EQU", Expression, null, Comment));
+                return FormatCodeLine(Label, "EQU", Expression, null, Comment);
             }
         }
         private class AssemblyConstantLine
@@ -359,9 +408,10 @@ namespace HP9825CPU
                     target.PrintSourceSubLine(Address + i, Values[i]);
                 }
             }
-            public override void PrintBeautified(System.IO.TextWriter target)
+
+            public override string Beautified()
             {
-                target.WriteLine(FormatCodeLine(Label, Mnemonic, string.Join(',', Values.Select(x => Convert.ToString(x, nBase))), null, Comment));
+                return FormatCodeLine(Label, Mnemonic, string.Join(',', Values.Select(x => Convert.ToString(x, nBase))), null, Comment);
             }
         }
 
@@ -393,9 +443,9 @@ namespace HP9825CPU
             {
                 target.PrintSourceLine(Address, null, Label, "BSS", Expression, Comment, false, IsFromMacro);
             }
-            public override void PrintBeautified(System.IO.TextWriter target)
+            public override string Beautified()
             {
-                target.WriteLine(FormatCodeLine(Label, "BSS", Expression, null, Comment));
+                return FormatCodeLine(Label, "BSS", Expression, null, Comment);
             }
         }
 
@@ -433,9 +483,10 @@ namespace HP9825CPU
             {
                 target.PrintSourceLine(Address, Value, Label, "DEF", Expression + (IsIndirect ? ",I" : ""), Comment, false, IsFromMacro);
             }
-            public override void PrintBeautified(System.IO.TextWriter target)
+
+            public override string Beautified()
             {
-                target.WriteLine(FormatCodeLine(Label, "DEF", Expression, IsIndirect ? "I" : null, Comment));
+                return FormatCodeLine(Label, "DEF", Expression, IsIndirect ? "I" : null, Comment);
             }
         }
 
@@ -472,9 +523,9 @@ namespace HP9825CPU
             {
                 target.PrintSourceLine(Address, Value, Label, "ABS", Expression, Comment, false, IsFromMacro);
             }
-            public override void PrintBeautified(System.IO.TextWriter target)
+            public override string Beautified()
             {
-                target.WriteLine(FormatCodeLine(Label, "ABS", Expression, null, Comment));
+                return FormatCodeLine(Label, "ABS", Expression, null, Comment);
             }
         }
 
@@ -499,9 +550,9 @@ namespace HP9825CPU
                 target.SuppressOutput = false;
                 target.PrintSourceLine(null, null, null, "END", null, Comment, false, IsFromMacro);
             }
-            public override void PrintBeautified(System.IO.TextWriter target)
+            public override string Beautified()
             {
-                target.WriteLine(FormatCodeLine(Label, "END", null, null, Comment));
+                return FormatCodeLine(Label, "END", null, null, Comment);
             }
         }
 
@@ -541,9 +592,9 @@ namespace HP9825CPU
             {
                 target.PrintSourceLine(Address, null, Label, "REP", Expression, Comment, false, IsFromMacro);
             }
-            public override void PrintBeautified(System.IO.TextWriter target)
+            public override string Beautified()
             {
-                target.WriteLine(FormatCodeLine(Label, "REP", Expression, null, Comment));
+                return FormatCodeLine(Label, "REP", Expression, null, Comment);
             }
         }
 
@@ -573,9 +624,9 @@ namespace HP9825CPU
             {
                 target.PrintSourceLine(Address, null, null, IsOrr ? "ORR" : "ORG", Expression, Comment, false, IsFromMacro);
             }
-            public override void PrintBeautified(System.IO.TextWriter target)
+            public override string Beautified()
             {
-                target.WriteLine(FormatCodeLine(Label, IsOrr ? "ORR" : "ORG", Expression, null, Comment));
+                return FormatCodeLine(Label, IsOrr ? "ORR" : "ORG", Expression, null, Comment);
             }
         }
 
@@ -632,9 +683,9 @@ namespace HP9825CPU
             public string Mnemonic { get; set; }
             public string? Operand { get; set; }
             public string? Suffix { get; set; }
-            public override void PrintBeautified(System.IO.TextWriter target)
+            public override string Beautified()
             {
-                target.WriteLine(FormatCodeLine(Label, Mnemonic, Operand, Suffix, Comment));
+                return FormatCodeLine(Label, Mnemonic, Operand, Suffix, Comment);
             }
         }
 
@@ -658,10 +709,9 @@ namespace HP9825CPU
             {
                 target.PrintCommentLine(Comment);
             }
-            public override void PrintBeautified(System.IO.TextWriter target)
+            public override string Beautified()
             {
-                target.Write("*");
-                target.WriteLine(Comment);
+                return "*" + (Comment ?? "");
             }
         }
 #endregion

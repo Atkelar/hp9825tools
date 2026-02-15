@@ -342,5 +342,11 @@ namespace HP9825CPU
             sb.AppendLine(_CrossRefOutput?.ToString() ?? string.Empty);
             return sb.ToString();
         }
+
+        internal void Clear()
+        {
+            (_Output as StringWriter)?.GetStringBuilder().Clear();
+            (_CrossRefOutput as StringWriter)?.GetStringBuilder().Clear();
+        }
     }
 }
