@@ -180,8 +180,8 @@ namespace HP9825CPU
             new CmdStructure(0b0_111_000_100_000_000, MaskAll, "SDO", true),
             // BPC main command structure....
             new CmdStructure(0b0_000_000_000_000_000, MaskAll, "NOP"), // NOP is actually a LDA A - but decodes first as NOP for readability.
-            new CmdStructure(0b1_111_000_101_000_111, MaskAll, "CLA"), // CLA is actually a SAR 16 - but decodes first for readability.
-            new CmdStructure(0b1_111_100_101_000_111, MaskAll, "CLB"), // CLB is actually a SBR 16 - but decodes first for readability.
+            new CmdStructure(0b1_111_000_101_001_111, MaskAll, "CLA"), // CLA is actually a SAR 16 - but decodes first for readability.
+            new CmdStructure(0b1_111_100_101_001_111, MaskAll, "CLB"), // CLB is actually a SBR 16 - but decodes first for readability.
 
             new CmdStructure(0b1_111_000_111_000_000, 0b1_111_011_111_110_000, $"R{MCAorB}R", OperandType.NValue, MaskLower4)
                 {
@@ -229,14 +229,14 @@ namespace HP9825CPU
             new CmdStructure(0b1_111_111_000_000_000, 0b1_111_111_000_000_000, $"SE{MCSetOrClear}", OperandType.SkipValue, MaskLower6)
                 {
                     Updates = new MnemonicUpdateSpec[] {
-                        new MnemonicUpdateSpec(0b0_000_000_100_000_000, SetOrClearMnemonicUpdate),
+                        new MnemonicUpdateSpec(0b0_000_000_100_000_000, ClearOrSetMnemonicUpdate),  // reverse mnemonic coding!!!
                         new MnemonicUpdateSpec(0b0_000_000_010_000_000, 0b0_000_000_001_000_000, ClearOrSetMnemonicUpdate, true)    // H bit is trigger bit for Clear or Set flag...
                     }
                 },
             new CmdStructure(0b1_111_011_000_000_000, 0b1_111_111_000_000_000, $"SO{MCSetOrClear}", OperandType.SkipValue, MaskLower6)
                 {
                     Updates = new MnemonicUpdateSpec[] {
-                        new MnemonicUpdateSpec(0b0_000_000_100_000_000, SetOrClearMnemonicUpdate),
+                        new MnemonicUpdateSpec(0b0_000_000_100_000_000, ClearOrSetMnemonicUpdate),
                         new MnemonicUpdateSpec(0b0_000_000_010_000_000, 0b0_000_000_001_000_000, ClearOrSetMnemonicUpdate, true)    // H bit is trigger bit for Clear or Set flag...
                     }
                 },

@@ -29,7 +29,7 @@ namespace CommandLineUtils.Visuals
 
         protected internal virtual void Start()
         {
-            this.QueueMessage(MessageCodes.MessagePaint, null);
+            this.QueueMessage(MessageCodes.Paint, null);
         }
 
         private int IdleCounter;
@@ -50,7 +50,7 @@ namespace CommandLineUtils.Visuals
             {
                 IdleCounter = 0;    // next idle is "immediate"...
                 var msg = _MessageQueue.Dequeue();
-                if (msg is MessageEventData me && me.Code == MessageCodes.MessageExit)
+                if (msg is MessageEventData me && me.Code == MessageCodes.Exit)
                 {
                     return null;
                 }
@@ -87,10 +87,10 @@ namespace CommandLineUtils.Visuals
             {
                 case MessageEventData m:
                 {
-                    if (m.Code == MessageCodes.MessageQuit && !m.Cancel)
+                    if (m.Code == MessageCodes.Quit && !m.Cancel)
                     {
                         _MessageQueue.Clear();  // thorw out pending stuff...
-                        QueueMessage(MessageCodes.MessageExit, null);
+                        QueueMessage(MessageCodes.Exit, null);
                     }
                     break;
                 }

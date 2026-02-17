@@ -65,7 +65,7 @@ namespace CommandLineUtils.Visuals
 
         protected void RegisterStandardHotkeys(HotkeyManager hotkeyManager, bool exit = true)
         {
-            if (exit) hotkeyManager.AddMessage(MessageCodes.MessageQuit, ConsoleKey.X, ConsoleModifiers.Alt);
+            if (exit) hotkeyManager.AddMessage(MessageCodes.Quit, ConsoleKey.X, ConsoleModifiers.Alt);
         }
         
         protected virtual void RegisterHotKeys(HotkeyManager hotkeyManager)

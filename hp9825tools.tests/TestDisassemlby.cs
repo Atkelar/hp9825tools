@@ -33,6 +33,14 @@ namespace hp9825tools.tests
             Assert.That(cl.ToString(), Is.EqualTo("      PWD A,I"));
         }
 
+        [Test]
+        public void TestAssembleSOC()
+        {
+            var cl = Disassembler.Disassemble(0xF602, 0 , includeDefaults: true);
+            Assert.That(cl.ToString(), Is.EqualTo("      SOC *+2"));
+        }
+
+
     //     [Test]
     //     public void TestStoreRegister()
     //     {

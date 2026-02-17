@@ -117,6 +117,8 @@ namespace CommandLineUtils.Visuals
 
         internal virtual void HandlePaint(Rectangle clipRectangle, Location parentOffset, CharBuffer targetBuffer)
         {
+            if (!_Shown)
+                return;
             // check if we care...
             var myRect = clipRectangle.Intersect(new Rectangle(Location.Origin, Size));
             if (myRect.IsEmpty)

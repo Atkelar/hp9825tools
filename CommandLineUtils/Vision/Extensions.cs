@@ -32,5 +32,22 @@ namespace CommandLineUtils.Visuals
                 return input.Substring(input.Length - length);
             return new string(padding, (input.Length - length)) + input;
         }
+
+
+        public static string PadCenter(this string input, int length, char padding = ' ')
+        {
+            if (input.Length==length)
+                return input;
+            int l1,l2;
+            if (input.Length>length)
+            {
+                l1 = (input.Length - length) / 2;
+                return input.Substring(l1, length);
+            }
+            l1 = (length - input.Length) / 2;
+            l2 = length - l1;
+
+            return (l1 > 0 ? new string(padding, l1) : string.Empty) + input + (l2 > 0 ? new string(padding, l2) : string.Empty);
+        }
     }
 }

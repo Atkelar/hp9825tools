@@ -6,11 +6,11 @@
     "configurations": [
 
         {
-            "name": "launch hp9825cpusim",
+            "name": "launch hp9825sim",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/hp9825cpusim.dll",
+            "program": "${workspaceFolder}/bin/Debug/hp9825sim.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",

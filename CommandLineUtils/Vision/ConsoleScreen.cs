@@ -22,6 +22,17 @@ namespace CommandLineUtils.Visuals
             Console.Clear();    // TODO: save?
         }
 
+        /// <summary>
+        /// True to mute "beep" outputs.
+        /// </summary>
+        public bool Muted { get; set; }
+
+        public override void Beep()
+        {
+            if (!Muted)
+                Console.Beep();
+        }
+
         protected override void BufferToScreen(int x, int y, ConsoleColor foreground, ConsoleColor background, char[] buffer, int index, int count)
         {
             Console.ForegroundColor = foreground;

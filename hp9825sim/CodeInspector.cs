@@ -2,7 +2,7 @@ using System;
 using CommandLineUtils.Visuals;
 using HP9825CPU;
 
-namespace HP9825CPUSimulator
+namespace HP9825Simulator
 {
     public class CodeInspector
         : Visual

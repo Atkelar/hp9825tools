@@ -2,7 +2,7 @@ using System;
 using CommandLineUtils.Visuals;
 using HP9825CPU;
 
-namespace HP9825CPUSimulator
+namespace HP9825Simulator
 {
     /// <summary>
     /// Visualize a section of memory, color coded by RAM/ROM/MISSING; tracking an address, and changes to the memory if requested.
@@ -62,7 +62,7 @@ namespace HP9825CPUSimulator
             int yOffs = 0;
             while (yOffs < Size.Height)
             {
-                if (memAddress < 0 || memAddress > _MemoryManager.BackingMemory.Length)
+                if (memAddress < 32 || memAddress > _MemoryManager.BackingMemory.Length)
                 {
                     // draw empty...
                     p.Repeat(new Location(0,yOffs), ' ', 15, 0);

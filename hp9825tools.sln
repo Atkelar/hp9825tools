@@ -15,7 +15,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CommandLineUtils", "Command
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hp9825utils", "hp9825utils\hp9825utils.csproj", "{6DDE5F4A-BF30-42E7-8CEF-8F02FD3B060A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hp9825cpusim", "hp9825cpusim\hp9825cpusim.csproj", "{BE395E72-FC5E-4A6F-9647-B54308C667FB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hp9825sim", "hp9825sim\hp9825sim.csproj", "{BE395E72-FC5E-4A6F-9647-B54308C667FB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

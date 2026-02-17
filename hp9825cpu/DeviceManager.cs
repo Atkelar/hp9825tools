@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace HP9825CPU
 {
@@ -29,10 +30,12 @@ namespace HP9825CPU
             if (selectCode<0 || selectCode>15)
                 throw new ArgumentOutOfRangeException(nameof(selectCode), selectCode, "Only 0-15 are allowed for device codes!");
             _Devices.Add(selectCode, instance);
+            _BackIndex.Add(instance, selectCode);
             instance.System = this;
         }
 
         private Dictionary<int, DeviceBase> _Devices = new Dictionary<int, DeviceBase>();
+        private Dictionary<DeviceBase, int> _BackIndex = new Dictionary<DeviceBase, int>();
 
         /// <summary>
         /// The (simulated) time that the hosting CPU has been running. Since the last reset. Can be used to coordinate timing based events.
@@ -43,7 +46,6 @@ namespace HP9825CPU
         /// The number of "clock ticks" that the hosting CPU has consumed. Estimated based on executed commands.
         /// </summary>
         public long Ticks => HostCpu?.Ticks ?? -1;
-
         
         internal void WriteIORegister(int selectCode, int regIndex, int value)
         {
@@ -62,17 +64,79 @@ namespace HP9825CPU
             return 0;   // missing device will cause "pulled up" negative logic to take, resulting in 0 in the CPU...
         }
 
-
         internal void Tick()
         {
             foreach(var d in _Devices.Values)
-                d.Tick();
+                d.TickInternal();
         }
 
         internal void Reset()
         {
             foreach(var d in _Devices.Values)
                 d.Reset();
+        }
+
+        private int InterruptRequestMask = 0;
+
+        internal InterruptLevel PendingInterruptLevel {get => InterruptRequestMask == 0 ? InterruptLevel.None : (( InterruptRequestMask & 0xF0  ) != 0 ? InterruptLevel.High : InterruptLevel.Low ); }
+
+        internal int? GetSelectCodeForInterruptAndConfirm(InterruptLevel levelToQuery)
+        {
+            if (InterruptRequestMask == 0)
+                return null;
+            int devCode = 16;
+            int end = 16;
+            switch(levelToQuery)
+            {
+                case InterruptLevel.Low:
+                    devCode  = 8;
+                    end = -1;
+                    break;
+                case InterruptLevel.High:
+                    end = 7;
+                    break;
+                default:
+                    return null;
+            }
+
+            while(devCode > end)
+            {
+                devCode--;
+
+                if ((InterruptRequestMask & (1<<devCode))!=0)
+                    break;
+            }
+
+            // we got a query, reset the request... TODO: IRL this is up to the device... but keeping the IRL/IRH lines pulled past the "INT" query seems bad practice...
+            InterruptRequestMask = 0;
+
+            if (devCode > end)
+            {
+                // device select code with highest interrupt priority within the requested level.
+                _Devices[devCode].InterruptConfirmed();
+                return devCode;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Request an interrupt from the device...
+        /// </summary>
+        /// <param name="which">The device object. Must be part of this system.</param>
+        internal void RequestInterrupt(DeviceBase which)
+        {
+            if (_BackIndex.TryGetValue(which, out var index))
+            {
+                InterruptRequestMask |= (1 << index);
+            }
+        }
+
+        public DeviceBase? GetAt(int selectCode)
+        {
+            if (!_Devices.TryGetValue(selectCode, out var x))
+                return null;
+            return x;
         }
     }
 }

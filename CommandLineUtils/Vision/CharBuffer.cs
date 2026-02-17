@@ -63,7 +63,7 @@ namespace CommandLineUtils.Visuals
             var br = rectangle.BottomRight;
             if (br.HasValue && Lines != null)
             {
-                for(int y = rectangle.Position.Y; y <= br.Value.Y; y++)
+                for(int y = rectangle.Position.Y; y <= br.Value.Y && y < Lines.Length; y++)
                 {
                     for(int x = rectangle.Position.X; x <= br.Value.X; x++)
                     {
@@ -78,7 +78,7 @@ namespace CommandLineUtils.Visuals
             var br = rectangle.BottomRight;
             if (br.HasValue && Lines != null)
             {
-                for(int y = rectangle.Position.Y; y <= br.Value.Y; y++)
+                for(int y = rectangle.Position.Y; y <= br.Value.Y  && y < Lines.Length; y++)
                 {
                     for(int x = rectangle.Position.X; x <= br.Value.X; x++)
                     {

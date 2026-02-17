@@ -16,7 +16,7 @@ namespace CommandLineUtils.Visuals
         private void HandleCancelKey(object? sender, ConsoleCancelEventArgs e)
         {
             e.Cancel = true;
-            QueueMessage(MessageCodes.MessageQuit, null);
+            QueueMessage(MessageCodes.Quit, null);
         }
 
         protected internal override void Start()

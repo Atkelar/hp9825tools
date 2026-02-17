@@ -1,6 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Threading.Channels;
 using System.Threading.Tasks;
+using Microsoft.VisualBasic;
 
 namespace HP9825CPU
 {
@@ -54,7 +58,7 @@ namespace HP9825CPU
         /// <summary>
         /// Gets the "virtual" up-time of the CPU.
         /// </summary>
-        public TimeSpan? UpTime => State == SimulatorState.Created ? TimeSpan.FromSeconds((double)Ticks / (double)ClockFrequency) : null;
+        public TimeSpan? UpTime => State != SimulatorState.Created ? TimeSpan.FromSeconds((double)Ticks / (double)ClockFrequency) : null;
 
         public MemoryManager Memory { get; private set; }
         public DeviceManager Devices { get; private set; }
@@ -222,10 +226,18 @@ namespace HP9825CPU
                 if (isIndirect)
                 {
                     value = ReadRegister((CpuRegister)addressRef);
+                    // TODO: indirect addressing with reg->reg-> chain will fail move register storage to memory?
                     if (Memory.Use16Bit || (value & 0x8000) == 0 || value == 0xFFFF)
-                        return true; 
+                        return true;
+                    while (true)
+                    {
+                        value = value & 0x7FFF;
+                        value = Memory[value];
+                        if ((value & 0x8000) == 0 || value == 0xFFFF)
+                            return true;
+                    }
                 }
-                value = addressRef;
+                value = addressRef; // oops...
                 return true;
             }
             if ((addressRef & 0x400)==0) // yes, base page!
@@ -351,6 +363,53 @@ namespace HP9825CPU
                 Fail($"ST instruction memory access error!");
             return InstructionResult.Ticks(ReadMemoryCycles * (_MeasureIndirections + 1) + WriteMemoryCycles + 1 + _MeasureTicks);
         }
+
+        private InstructionResult HandleInterruptCall(int interruptServiceHandlerAddress)
+        {
+            // copy functionallity of "JSM" for the call
+            int rValue = ReadRegister(CpuRegister.R);
+            rValue++;
+            if (rValue >(Memory.Use16Bit ? 0xFFFF : 0x7FFF))
+                Fail($"JSM stack overflow during INT!");
+            else
+            {
+                int handlerAddress = interruptServiceHandlerAddress;
+                if(Memory.Use16Bit)
+                {
+                    if (!ReadFromAbsoluteAddress(interruptServiceHandlerAddress, out handlerAddress))
+                    {
+                        Fail("INT table malformed!");
+                        handlerAddress = -1;
+                    }
+                }
+                else
+                {
+                    while ((handlerAddress & 0x8000)!=0)
+                    {
+                        handlerAddress = handlerAddress & 0x7FFF;
+                        if (!ReadFromAbsoluteAddress(handlerAddress, out handlerAddress))
+                        {
+                            Fail("INT indirection fail!");
+                            handlerAddress = -1;
+                            break;
+                        }
+                    }
+                }
+                if(handlerAddress>=0)
+                {
+                    if (_MemoryBreakpoints.TryGetValue(rValue, out var bp))
+                    {
+                        if (bp.IsEnabled && bp.OnWrite)
+                            _memBreakHit = bp;
+                    }
+                    Memory[rValue] = PC;
+                    WriteRegister(CpuRegister.R, rValue);
+                    return InstructionResult.TicksAbsolute(ReadMemoryCycles * (_MeasureIndirections + 1) + WriteMemoryCycles + 5 + _MeasureTicks, handlerAddress);
+                }
+            }
+            return InstructionResult.Ticks(ReadMemoryCycles * (_MeasureIndirections + 1) + WriteMemoryCycles + 5 + _MeasureTicks);
+        }
+
         private InstructionResult HandleJSM(int code)
         {
             if (AddressFromRef(code & 0x7FF, (code & 0x8000) != 0, out int value))
@@ -470,7 +529,14 @@ namespace HP9825CPU
                 if ((n &0x20)!=0)
                     n = -32 + (n & 0x1F);    // make sure we get the negative part...
                 if (pop)        // interrupt handling: TODO!
-                    throw new NotImplementedException();
+                {
+                    if (this.IODeviceInterruptStack[0].InterruptedFrom != InterruptLevel.None)
+                    {   // we have something to pop!
+                        WriteRegister(CpuRegister.PA, IODeviceInterruptStack[0].SavedPA);
+                        IODeviceInterruptStack[0]= IODeviceInterruptStack[1];
+                        IODeviceInterruptStack[1].InterruptedFrom = InterruptLevel.None;
+                    }
+                }
             }
             return InstructionResult.TicksAbsolute(ReadMemoryCycles * 2 + 4, nextBase + n);
         }
@@ -483,7 +549,8 @@ namespace HP9825CPU
                 {
                     ExeOpcode = value;
                 }
-                Fail($"EXE instruction memory access error!");
+                else
+                    Fail($"EXE instruction memory access error!");
             }
             else
                 Fail($"EXE instruction memory access error!");
@@ -877,10 +944,20 @@ namespace HP9825CPU
                 else
                 {
                     // 15bit mode: MSB of address = byte. BUT 0 = right , 1 = left!
+                    // increment for put is BEFORE access, so toggle high bit...
+                    address = address ^ 0x8000;
                     lowByte = (address & 0x8000) == 0;
                     address = address & 0x7FFF;
-                    if (!lowByte)   // zero to one transition in the bit...
-                        address += decrement ? -1 : 1;
+                    if (decrement)
+                    {
+                        if (lowByte)   // one to zero transition in the bit...
+                            address--;
+                    }
+                    else
+                    {
+                        if (!lowByte)   // zero to one transition in the bit...
+                            address++;
+                    }
                     if (address < 32 || address >= Memory.BackingMemory.Length)
                         Fail($"Invalid address for stack operation. Must not be CPU or outside of memory.");
                     else
@@ -896,7 +973,6 @@ namespace HP9825CPU
                         else
                             Memory[address] = (Memory[address] & 0x00FF) | ((value << 8) & 0xFF00);
                         // strange thing... but pate 99 says so...
-                        lowByte = !lowByte;
                         address |= lowByte ? 0 : 0x8000;
                         WriteRegister(counterReg, address);
                     }
@@ -931,6 +1007,8 @@ namespace HP9825CPU
                 else
                 {
                     address += decrement ? -1 : 1;
+                    // if we get an address with a leading one here, ingore it!
+                    address &=0x7FFF;
                     if (address < 32 || address >= Memory.BackingMemory.Length)
                         Fail($"Invalid address for stack operation. Must not be CPU or outside of memory.");
                     else
@@ -957,8 +1035,9 @@ namespace HP9825CPU
 
             int address = ReadRegister(counterReg);
 
-            // TODO: Check if the read of a byte sets the upper targget bits to zero? Currently assuming "unchanged".
-            int value = ReadRegister(reg);
+            // TODO: Check if the read of a byte sets the upper targget bits to zero? Currently assuming "set null".
+            //int value = ReadRegister(reg);
+            int value = 0;
 
             // here, the fun begins... addressing in 15/16 bit mode is quite different...
             if (byteOperation)
@@ -1013,8 +1092,16 @@ namespace HP9825CPU
                             value = (value & 0xFF00) | ((Memory[address] >> 8) & 0xFF);
                         // strange thing... but pate 99 says so...
                         lowByte = !lowByte;
-                        if (!lowByte)   // zero to one transition in the bit...
-                            address += decrement ? -1 : 1;
+                        if (decrement)
+                        {
+                            if (lowByte)   // one to zero transition in the bit...
+                                address--;
+                        }
+                        else
+                        {
+                            if (!lowByte)   // zero to one transition in the bit...
+                                address++;
+                        }
                         address |= lowByte ? 0 : 0x8000;
                         WriteRegister(counterReg, address);
                     }
@@ -1075,12 +1162,16 @@ namespace HP9825CPU
             int address = ReadRegister(CpuRegister.A);
             for(int i = 0;i<n;i++)
             {
-                if (_MemoryBreakpoints.TryGetValue(address + i, out var bp))
+                if (_MemoryBreakpoints.TryGetValue(address, out var bp))
                 {
-                    if (bp.IsEnabled && bp.OnRead)
+                    if (bp.IsEnabled && bp.OnWrite)
                         _memBreakHit = bp;
                 }
-                Memory[address+i] = 0;
+                if (address<32)
+                    registers[address] = 0;
+                else
+                    Memory[address] = 0;
+                address++;
             }
             return InstructionResult.Ticks(ReadMemoryCycles + WriteMemoryCycles * n + 10);
         }
@@ -1091,17 +1182,23 @@ namespace HP9825CPU
             int address2 = ReadRegister(CpuRegister.B);
             for(int i = 0;i<n;i++)
             {
-                if (_MemoryBreakpoints.TryGetValue(address1+i, out var bp))
+                if (_MemoryBreakpoints.TryGetValue(address1, out var bp))
                 {
                     if (bp.IsEnabled && bp.OnRead)
                         _memBreakHit = bp;
                 }
-                if (_MemoryBreakpoints.TryGetValue(address2+i, out bp))
+                if (_MemoryBreakpoints.TryGetValue(address2, out bp))
                 {
                     if (bp.IsEnabled && bp.OnWrite)
                         _memBreakHit = bp;
                 }
-                Memory[address2+i] = Memory[address1+i];
+                var val = address1 < 32 ? registers[address1] : Memory[address1];
+                if (address2 < 32)
+                    registers[address2] = val;
+                else
+                    Memory[address2] = val;
+                address1++;
+                address2++;
             }
             return InstructionResult.Ticks(ReadMemoryCycles * (n + 1) + n * WriteMemoryCycles + 15);
         }
@@ -1134,11 +1231,16 @@ namespace HP9825CPU
                         stuffValue = 0;
                     }
                     WriteRegister(CpuRegister.A, lastOut);
+                    WriteRegister(CpuRegister.SE, lastOut);
                     ar1.PutMantissa(digits);
                     WriteAR1(ar1);
-                    DecimalCarry = false;
                 }
             }
+            else
+            {
+                WriteRegister(CpuRegister.SE, aReg & 0xF);
+            }
+            DecimalCarry = false;
 
             return InstructionResult.Ticks(shiftCount== 0 ? ReadMemoryCycles + 20 : 4*ReadMemoryCycles + 3*WriteMemoryCycles + 4*shiftCount + 20);
         }
@@ -1172,7 +1274,7 @@ namespace HP9825CPU
         private InstructionResult HandleDRS(int code)
         {
             // mantissa right shift of AR1...
-            // n-count is 1 rotate A &0xF through first/last digits...
+            // n-count is 1 in 0 through first/last digits...
             FloatingPointNumber ar1 = ReadAR1();
             int[] digits = ar1.GetMantissa();
             int lastOut=digits[11];
@@ -1238,7 +1340,7 @@ namespace HP9825CPU
                     for(int i=0;i<shiftCount;i++)
                     {
                         lastOut = digits[11];
-                        for(int digit = 12; digit > 1; digit--)
+                        for(int digit = 11; digit > 0; digit--)
                         {
                             digits[digit] = digits[digit-1];
                         }
@@ -1246,11 +1348,17 @@ namespace HP9825CPU
                         stuffValue = 0;
                     }
                     WriteRegister(CpuRegister.A, lastOut);
+                    WriteRegister(CpuRegister.SE, lastOut);
                     ar2.PutMantissa(digits);
                     WriteAR2(ar2);
                     DecimalCarry = false;
                 }
             }
+            else    // TODO: validate. The manual is not precise enough; also MRX!
+            {
+                WriteRegister(CpuRegister.SE, aReg & 0xF);
+            }
+            DecimalCarry = false;
 
             return InstructionResult.Ticks(shiftCount == 0 ? ReadMemoryCycles+20 : ReadMemoryCycles + 4*shiftCount + 27);
         }
@@ -1274,7 +1382,6 @@ namespace HP9825CPU
             ar2.PutMantissa(digits);
             WriteAR2(ar2);
             DecimalCarry = numShifts > 11;
-            // TODO: "SE equals <A0-3>"??? Patge 104
 
             return InstructionResult.Ticks(numShifts < 12 ? ReadMemoryCycles + numShifts + 17 : ReadMemoryCycles + 63);
         }
@@ -1282,7 +1389,7 @@ namespace HP9825CPU
         {
             // Mantissa addition: AR1+AR2, but mantissa only! Set DC for overflow.
             var ar2 = ReadAR2();
-            var ar1 = ReadAR2();
+            var ar1 = ReadAR1();
             var m1 = ar1.GetMantissa();
             var m2 = ar2.GetMantissa();
             // page 105
@@ -1355,12 +1462,13 @@ namespace HP9825CPU
                 }
             }
             DecimalCarry = false;
+            ar1.PutMantissa(m);
             WriteAR1(ar1);
             return InstructionResult.Ticks(4*ReadMemoryCycles + 4*WriteMemoryCycles + 17);
         }
         private InstructionResult HandleCMY(int code)
         {
-            // 10's complement of AR1 - DC = 0
+            // 10's complement of AR2 - DC = 0
             var ar2 = ReadAR2();
             var m = ar2.GetMantissa();
             // page 69
@@ -1374,6 +1482,7 @@ namespace HP9825CPU
                 }
             }
             DecimalCarry = false;
+            ar2.PutMantissa(m);
             WriteAR2(ar2);
             return InstructionResult.Ticks(ReadMemoryCycles+17);
         }
@@ -1382,7 +1491,7 @@ namespace HP9825CPU
             // Fast Multiply Mantissa: AR2+AR1*B, but mantissa only! Set DC for overflow.
             int count = ReadRegister(CpuRegister.B) & 0xF;
             var ar2 = ReadAR2();
-            var ar1 = ReadAR2();
+            var ar1 = ReadAR1();
             var m1 = ar1.GetMantissa();
             var m2 = ar2.GetMantissa();
             // page 105
@@ -1407,7 +1516,7 @@ namespace HP9825CPU
                 {
                     overflows++;
                 }
-                carry = 0;
+                carry = 0;  // we only use the DC for the first addition...
             }
             DecimalCarry=false;
 
@@ -1422,17 +1531,20 @@ namespace HP9825CPU
         {
             // Fast Divide Mantissa: , but mantissa only! Set DC for overflow.
             var ar2 = ReadAR2();
-            var ar1 = ReadAR2();
+            var ar1 = ReadAR1();
             var m1 = ar1.GetMantissa();
             var m2 = ar2.GetMantissa();
-                int count = 0;
+            int count = 0;
+            Debug.WriteLine("FDV   {0}", ar2);
+            Debug.WriteLine("  /   {0}", ar1);
             // page 105
             if (ar1.IsZero)
                 Fail("FDV had a divide by zero condition. AR1 is zero.");
             else
             {
                 // TODO: validate: spec on page 106 is a bit unclear. Will DC be reset after each round or not?
-                int carry = DecimalCarry ? 1 : 0;
+                int carry;
+                carry = DecimalCarry ? 1 : 0;
                 do
                 {
                     for(int i = 11; i >=0;i--)
@@ -1448,13 +1560,15 @@ namespace HP9825CPU
                         m2[i] = sum;
                     }
                     if (carry == 0)
+                    {
                         count++;
+                    }
                 } while (carry == 0);
 
                 DecimalCarry=false;
-                DecimalCarry = carry > 0;
                 ar2.PutMantissa(m2);
                 WriteAR2(ar2);
+                Debug.WriteLine("  =   {0}, {1}", ar2, count);
                 WriteRegister(CpuRegister.B, count);
             }
 
@@ -1560,6 +1674,8 @@ namespace HP9825CPU
                 { 0xF060, HandleCMAB }, // SMA, SMB
                 { 0xF100, HandleAABR }, // AAR, ABR
                 { 0xF140, HandleSABR }, // SAR, SBR
+                { 0xF14F, HandleSABR }, // CLA
+                { 0xF94F, HandleSABR }, // CLB
                 { 0xF180, HandleSABL }, // SAL, SBL
                 { 0xF1C0, HandleRABR }, // RAR, RBR
                 { 0x7110, HandleEIR },  // I/O Group
@@ -1695,39 +1811,86 @@ namespace HP9825CPU
             }
             _memBreakHit = null;
             ChangeState(SimulatorState.Running); // set here, so any subsequent code can update to other states.
-            var opCode = ExeOpcode.GetValueOrDefault(Memory[PC]);   // "EXE" result first... if again, we'll loop...
-            var bp = Disassembler.BasePattern(opCode);
-            if (!Handlers.TryGetValue(bp, out var thisHandler))
+            HandleDeviceTick();
+            if(State == SimulatorState.FailedState)
+                return;
+
+            InstructionResult result;
+
+            if(CallInterruptServiceHandler.HasValue)
             {
-                Fail($"OpCode {opCode} from {PC} is not recognized!");
+                ResetTiming();
+                result = HandleInterruptCall(CallInterruptServiceHandler.Value);
+                CallInterruptServiceHandler = null;
             }
             else
             {
-                ResetTiming();
-                var result = thisHandler(opCode);
-                if (State != SimulatorState.FailedState)    // only tick over if we are still in a valid state...
+                var opCode = ExeOpcode.GetValueOrDefault(Memory[PC]);   // "EXE" result first... if again, we'll loop...
+                ExeOpcode = null;
+                var bp = Disassembler.BasePattern(opCode);
+                if (!Handlers.TryGetValue(bp, out var thisHandler))
                 {
-                    var old = Ticks;
-                    Ticks += result.TickCounter;
-                    if (result.MoveProgramCounerAbsolute.HasValue)
-                        PC = result.MoveProgramCounerAbsolute.Value;
-                    else
-                        PC+= result.MoveProgramCounterDelta;
-                    OnTicked(old);
-                    // check for breakepoint hit!
-                    if (_Breakpoints.TryGetValue(PC, out var bpDef))
-                    {
-                        if (bpDef.IsEnabled)    // todo: conditional? counter? 
-                        {
-                            ChangeState(SimulatorState.BreakPointHit);
-                        }
-                    }
-                    if(_memBreakHit != null)
+                    Fail($"OpCode {opCode} from {PC} is not recognized!");
+                    result = new InstructionResult();
+                }
+                else
+                {
+                    ResetTiming();
+                    result = thisHandler(opCode);
+                }
+            }
+            if (State != SimulatorState.FailedState)    // only tick over if we are still in a valid state...
+            {
+                var old = Ticks;
+                Ticks += result.TickCounter;
+                if (result.MoveProgramCounerAbsolute.HasValue)
+                    PC = result.MoveProgramCounerAbsolute.Value;
+                else
+                    PC+= result.MoveProgramCounterDelta;
+                OnTicked(old);
+                // check for breakepoint hit!
+                if (_Breakpoints.TryGetValue(PC, out var bpDef))
+                {
+                    if (bpDef.IsEnabled)    // todo: conditional? counter? 
                     {
                         ChangeState(SimulatorState.BreakPointHit);
                     }
                 }
+                if(_memBreakHit != null)
+                {
+                    ChangeState(SimulatorState.BreakPointHit);
+                }
             }
+        }
+
+        // two levels...
+        private (int SavedPA, InterruptLevel InterruptedFrom)[] IODeviceInterruptStack = new (int SavedPA, InterruptLevel InterruptedFrom)[2];
+
+        private int? CallInterruptServiceHandler = null;
+
+        private void HandleDeviceTick()
+        {
+            // first... did the last tick yield an IRQ?
+            var pil = Devices.PendingInterruptLevel;
+            if (pil != InterruptLevel.None && InterruptsEnabled && !CallInterruptServiceHandler.HasValue) // Avoid race condition during JSM IV operation.
+            {
+                // could be...
+                if(IODeviceInterruptStack[0].InterruptedFrom == InterruptLevel.None || pil == InterruptLevel.High && IODeviceInterruptStack[0].InterruptedFrom == InterruptLevel.Low)
+                {
+                    int? deviceId = Devices.GetSelectCodeForInterruptAndConfirm(pil);
+                    if(deviceId.HasValue)
+                    {
+                        // we only accept the interrupt if we are "first" or "higher priority";     this.State = SimulatorState.BreakPointHit
+                        IODeviceInterruptStack[1] = IODeviceInterruptStack[0];
+                        IODeviceInterruptStack[0].InterruptedFrom = pil;
+                        IODeviceInterruptStack[0].SavedPA = ReadRegister(CpuRegister.PA);
+                        WriteRegister(CpuRegister.PA, deviceId.Value);
+                        
+                        CallInterruptServiceHandler = (ReadRegister(CpuRegister.IV) & 0xFFF0) | deviceId.Value;
+                    }
+                }
+            }
+            Devices.Tick();
         }
 
         public void ClearBreakPoint(int address)
@@ -1797,7 +1960,7 @@ namespace HP9825CPU
 
         public bool IsFreeRunning { get; private set; }
 
-        public async Task Run(bool realTime = false)
+        public async Task Run(bool realTime = false, long? tickLimit = null)
         {
             if (IsFreeRunning)
                 throw new InvalidOperationException("Cannot run while already running!");
@@ -1805,8 +1968,11 @@ namespace HP9825CPU
                 throw new InvalidOperationException("Simulator state is invalid for free running mode. Needs to be properly reset first!");
             IsFreeRunning = true;
             DateTime startedRunning = DateTime.UtcNow;
-            TimeSpan startedVirtual = this.UpTime.GetValueOrDefault();
+            TimeSpan startedVirtual = UpTime.GetValueOrDefault();
             ChangeState(SimulatorState.Running);
+            var startedAt = Ticks;
+            if (tickLimit.HasValue)
+                tickLimit = startedAt + tickLimit.Value;
             while (State == SimulatorState.Running)
             {
                 Tick();
@@ -1816,6 +1982,8 @@ namespace HP9825CPU
                     DateTime now = DateTime.UtcNow;
                     // TODO: wait if we run fast... tell the outside if we run slow...
                 }
+                if(tickLimit.HasValue && tickLimit.Value < Ticks)
+                    break;
             }
             IsFreeRunning = false;
             OnStateChanged();   // report new state changed

@@ -38,6 +38,24 @@ namespace HP9825CPU
         {
         }
 
+
+
+        /// <summary>
+        /// Pushes the buttons for an interrupt request. Note that this is a multi-step process that may also fail... Should be called during any "Tick" code and will trigger the interrupt handling on the next tick, as per spec.
+        /// </summary>
+        protected void RequestInterrupt()
+        {
+            System?.RequestInterrupt(this);
+        }
+
+        /// <summary>
+        /// Called by the distribution agent, handles interrupt and DMA stuff, then calls "Tick".
+        /// </summary>
+        internal void TickInternal()
+        {
+            Tick();
+        }
+
         /// <summary>
         /// Called from the device manager, whenever the CPU writes to an IO register (R4-R7). NOTE: the regIndex will be in "device number space", i.e. 0-3, reflecting the two IO lines.
         /// </summary>
@@ -55,5 +73,12 @@ namespace HP9825CPU
         /// Called upon every "clock" tick (=CPU instruction) - use this to track the passage of time and queue interrupts or DMA requests as needed.
         /// </summary>
         protected internal abstract void Tick();
+
+        /// <summary>
+        /// Called from the device manager, when the CPU has granted the interrupt and is about to execute the matching service routine.
+        /// </summary>
+        protected internal virtual void InterruptConfirmed()
+        {
+        }
     }
 }

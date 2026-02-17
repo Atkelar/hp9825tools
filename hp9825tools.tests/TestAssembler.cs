@@ -35,6 +35,24 @@ namespace hp9825tools.tests
         }
 
         [Test]
+        public void TestAssembleSOC()
+        {
+            var memory = HP9825CPU.Memory.MakeMemory(false);
+            var cl = Assembler.Parse(SourceLineRef.Unknown, "  SOC *+2", null, 7);
+            cl.ApplyTo(memory);
+            Assert.That(memory[7], Is.EqualTo(0xF602));
+        }
+
+        [Test]
+        public void TestAssembleCallISR()
+        {
+            var memory = HP9825CPU.Memory.MakeMemory(false);
+            var cl = Assembler.Parse(SourceLineRef.Unknown, "  JSM IV,I", null, 7);
+            cl.ApplyTo(memory);
+            Assert.That(memory[7], Is.EqualTo(0xC008));
+        }
+
+        [Test]
         public void TestStackOperations()
         {
             var memory = HP9825CPU.Memory.MakeMemory(false);

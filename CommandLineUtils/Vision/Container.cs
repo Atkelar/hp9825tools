@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Formats.Asn1;
+using System.Net.Mime;
 using System.Security.Cryptography;
 
 namespace CommandLineUtils.Visuals
@@ -27,6 +28,8 @@ namespace CommandLineUtils.Visuals
         /// <param name="targetBuffer">The output target.</param>
         internal override void HandlePaint(Rectangle clipRectangle, Location parentOffset, CharBuffer targetBuffer)
         {
+            if (!IsVisible)
+                return;
             // check if we care...
             var myRect = clipRectangle.Intersect(ClientArea);
             if (myRect.IsEmpty)
@@ -59,7 +62,7 @@ namespace CommandLineUtils.Visuals
                 for(int j = pendingAreas.Count-1;j>=0;j--)
                 {
                     var pj = pendingAreas[j];
-                    if (!pj.IsEmpty)    // old leftover...
+                    if (!pj.IsEmpty && _Children[i].IsVisible)    // old leftover... go against child visual if visible...
                     {
                         var cr = _Children[i].ClientArea.Move(ChildrenScrollOffset);
                         myRect = cr.Intersect(pj);
@@ -140,6 +143,8 @@ namespace CommandLineUtils.Visuals
         /// <param name="rectangle">The rectangle to invalidate, relative to the child.</param>
         public void InvalidateChild(Visual child, Rectangle? rectangle = null)
         {
+            if (!IsVisible) // don't bother!
+                return;
             Rectangle total;
             if (rectangle.HasValue)
             {
@@ -168,6 +173,8 @@ namespace CommandLineUtils.Visuals
                 var tc = _Children[i];
                 if (tc == child)
                     break;
+                if(!tc.IsVisible)   // ignore, is hidden...
+                    continue;
                 while (workQueue.Count>0)
                 {
                     var rWork = workQueue.Dequeue();
@@ -202,7 +209,7 @@ namespace CommandLineUtils.Visuals
                 }
                 else
                 {
-                    Host?.QueueMessage(MessageCodes.MessagePaint, this, rWork);
+                    Host?.QueueMessage(MessageCodes.Paint, this, rWork);
                 }
             }
         }

@@ -188,10 +188,13 @@ namespace CommandLineUtils.Visuals
         {
             Rectangle rDo = rect ?? new Rectangle(Location.Origin, VisibleSize);
             //RepaintArea = RepaintArea.HasValue ? RepaintArea.Value.Union(rDo) : rDo;
-            Host?.QueueMessage(MessageCodes.MessagePaint, null, rDo);
+            Host?.QueueMessage(MessageCodes.Paint, null, rDo);
         }
 
         //protected Rectangle? RepaintArea { get; private set; }
+        /// <summary>
+        /// True to indicate that the driver supports a redirected "stdout". Defaults to false.
+        /// </summary>
         public virtual bool SupportsRedirectedConsole { get => false; }
 
         /// <summary>
@@ -296,6 +299,12 @@ namespace CommandLineUtils.Visuals
         }
 
         /// <summary>
+        /// Override to implement "beep" message handling.
+        /// </summary>
+        public virtual void Beep()
+        {}
+
+        /// <summary>
         /// Release any external resources.
         /// </summary>
         /// <param name="isDisposing">If true, also call dispose on managed resources.</param>
@@ -318,15 +327,23 @@ namespace CommandLineUtils.Visuals
 
         internal void HandleEvent(EventData evt)
         {
+            if (evt is MessageEventData md)
+            {
+                switch(md.Code)
+                {
+                    case MessageCodes.Beep:
+                        Beep();
+                        return;
+                    case MessageCodes.Paint:
+                        if (md.Args != null)
+                            Paint((Rectangle)md.Args);
+                        else
+                            Paint(new Rectangle(Location.Origin, this.CurrentSize));
+                        return;
+                }
+            }
             if (RootVisual != null)
                 RootVisual.HandleEvent(evt);
-            if (evt is MessageEventData md && md.Code == MessageCodes.MessagePaint)
-            {
-                if (md.Args != null)
-                    Paint((Rectangle)md.Args);
-                else
-                    Paint(new Rectangle(Location.Origin, this.CurrentSize));
-            }
         }
     }
 }

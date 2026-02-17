@@ -49,6 +49,8 @@ namespace HP9825CPU
         {
             get 
             {
+                if (address < 32)
+                    throw new InvalidOperationException();
                 switch(GetTypeFor(address))
                 {
                     case MemoryType.Missing:
@@ -61,6 +63,8 @@ namespace HP9825CPU
             }
             set 
             {
+                if (address < 32)
+                    throw new InvalidOperationException();
                 switch(GetTypeFor(address))
                 {
                     case MemoryType.Missing:

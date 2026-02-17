@@ -1,8 +1,9 @@
 using System;
+using System.Reflection;
 using CommandLineUtils.Visuals;
 using HP9825CPU;
 
-namespace HP9825CPUSimulator
+namespace HP9825Simulator
 {
     internal class StatusDisplay 
         : Container
@@ -29,9 +30,9 @@ namespace HP9825CPUSimulator
             AddChild(_MemViewer);
 
             var mv = new MemoryInspector(simulator.Memory, false);
-            mv.DisplayOffset = Convert.ToInt32("77533", 8);// 0x7e97;
+            mv.DisplayOffset = Convert.ToInt32("77072", 8);// 0x7e97;  key table address entry for "D"...?
             mv.Position = new Location(40,0);
-            mv.Size = new Size(mv.Size.Width, 21);
+            mv.Size = new Size(mv.Size.Width, 8);
             mv.Show();
             AddChild(mv);
 
@@ -39,10 +40,26 @@ namespace HP9825CPUSimulator
             _CodeInspector.Position = new Location(13, 8);
             _CodeInspector.Show();
             AddChild(_CodeInspector);
-            
+
             _Simulator.Ticked += CPU_Ticked;
             _Simulator.Resetted += CPU_Resetted;
             _Simulator.StateChanged += CPU_StateChanged;
+
+            KeyboardDisplayPrinterDevice? dev = _Simulator.Devices.GetAt(0) as KeyboardDisplayPrinterDevice;
+            if (dev != null)    // we got the default KDP...
+            {
+                var disp = new DisplayOutput(dev);
+                disp.Position = new Location(2, 10);
+                disp.Show();
+                AddChild(disp);
+
+
+                var prt = new PrinterOutput(dev);
+                prt.Position = new Location(40,7);
+                prt.Size = new Size(prt.Size.Width, 7);
+                prt.Show();
+                AddChild(prt);
+            }
         }
 
         private void CPU_StateChanged(object? sender, EventArgs e)

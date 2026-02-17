@@ -1,0 +1,4 @@
+Just some random notes about the system ROM image and patent source code.
+
+10257  shows "RAR 10" in the source code, but it should read "RAR 12", based on working ROM image and opcode 170711 listed!
+
