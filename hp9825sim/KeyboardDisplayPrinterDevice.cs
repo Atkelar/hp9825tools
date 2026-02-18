@@ -222,7 +222,7 @@ namespace HP9825Simulator
         {
             if (PrintedLine != null)
             {
-                PrintedLine(this, new LinePrintedEventArgs(LastPrintedLine));
+                PrintedLine(this, new LinePrintedEventArgs(LastPrintedLine, System?.RunTime ?? TimeSpan.Zero));
             }
         }
 

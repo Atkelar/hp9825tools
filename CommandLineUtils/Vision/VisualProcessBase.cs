@@ -71,6 +71,13 @@ namespace CommandLineUtils.Visuals
         protected virtual void RegisterHotKeys(HotkeyManager hotkeyManager)
         {}
 
+        protected void QueueCommand(string code, object? args)
+        {
+            this._RunningInput?.QueueMessage(code, null, args);
+        }
+
+        private Input? _RunningInput;
+
         protected override async Task RunNow()
         {
             try
@@ -92,6 +99,7 @@ namespace CommandLineUtils.Visuals
                     if (!input.SupportsRedirectedConsole && Console.IsInputRedirected)
                         throw Errors.Happened(VisualProcessError.RedirectionNotSupported);
 
+                    _RunningInput = input;
                     screen.Initialize(driver, MinimumSize(), MaximumSize());
                     screen.RootVisual = CreateRootVisual();
                     screen.RootVisual.Show();
@@ -119,6 +127,10 @@ namespace CommandLineUtils.Visuals
             catch(ApplicationStateException ex)
             {
                 throw Errors.Happened(VisualProcessError.InternalProcessingError, ex);
+            }
+            finally
+            {
+                _RunningInput = null;
             }
         }
 

@@ -22,6 +22,7 @@ namespace HP9825Simulator
         public const string ResetCommand = "reset";
         public const string StepCommand = "step";
         public const string RunCommand = "run";
+        public const string ExportPrinterCommand = "prt-html";
 
         protected override bool HandleEvent(EventData evt)
         {
@@ -41,6 +42,9 @@ namespace HP9825Simulator
                         case RunCommand:
                             Simulator?.Run(true, 10 * Simulator.ClockFrequency);    // 10 "second" timeout...
                             return true;
+                        case ExportPrinterCommand:
+                            this.QueueCommand(PrinterOutput.ExportToHtmlCommand, "private/test-prt.html");
+                            return true;
                     }
                     break;
             }
@@ -54,6 +58,7 @@ namespace HP9825Simulator
             hotkeyManager.AddMessage(StepCommand, ConsoleKey.Spacebar);
             hotkeyManager.AddMessage(StepCommand, ConsoleKey.F11);
             hotkeyManager.AddMessage(RunCommand, ConsoleKey.F5);
+            hotkeyManager.AddMessage(ExportPrinterCommand, ConsoleKey.P, ConsoleModifiers.Alt);
             base.RegisterHotKeys(hotkeyManager);
         }
 
@@ -110,7 +115,8 @@ namespace HP9825Simulator
             //TestCalc(kdp);
             //TestCalc2(kdp);
             //TestCalcVars(kdp);
-            TestProgram(kdp);
+            //TestProgram(kdp);
+            TestCat(kdp);
 
             devices.Add(0, kdp);
 
@@ -156,6 +162,36 @@ namespace HP9825Simulator
             // save state?!
         }
 
+        private void TestCat(KeyboardDisplayPrinterDevice kdp)
+        {
+            kdp.PutKeyPresses("spc 2", TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Store);
+            kdp.PutKeyPress(HP9825Key.Run, false, TimeSpan.FromSeconds(15));
+            kdp.PutKeyPresses("dsp\"starting...\"", TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Store);
+
+            kdp.PutKeyPresses("prt\"   '\"", TimeSpan.FromSeconds(0.7));
+            kdp.PutKeyPress(HP9825Key.Store);
+            kdp.PutKeyPresses("prt\" .'|_\"", TimeSpan.FromSeconds(0.7));
+            kdp.PutKeyPress(HP9825Key.Store);
+            kdp.PutKeyPresses("prt\"/ o  '-__,\"", TimeSpan.FromSeconds(0.7));
+            kdp.PutKeyPress(HP9825Key.Store);
+            kdp.PutKeyPresses("prt\";  - o  .'\"", TimeSpan.FromSeconds(0.7));
+            kdp.PutKeyPress(HP9825Key.Store);
+            kdp.PutKeyPresses("prt\"|    -._(;\"", TimeSpan.FromSeconds(0.7));
+            kdp.PutKeyPress(HP9825Key.Store);
+            kdp.PutKeyPresses("prt\"| | | / )/\"", TimeSpan.FromSeconds(0.7));
+            kdp.PutKeyPress(HP9825Key.Store);
+            kdp.PutKeyPresses("prt\"'-'-''--'\"", TimeSpan.FromSeconds(0.7));
+            kdp.PutKeyPress(HP9825Key.Store);
+            kdp.PutKeyPresses("spc 2", TimeSpan.FromSeconds(1));
+            kdp.PutKeyPress(HP9825Key.Store);
+            // kdp.PutKeyPresses("list", TimeSpan.FromSeconds(1));
+            // kdp.PutKeyPress(HP9825Key.Execute);
+
+            kdp.PutKeyPress(HP9825Key.Run, false, TimeSpan.FromSeconds(1));
+        }
+
         private void TestProgram(KeyboardDisplayPrinterDevice kdp)
         {
             kdp.PutKeyPresses("dsp\"starting...\"", TimeSpan.FromSeconds(2));
@@ -168,8 +204,6 @@ namespace HP9825Simulator
             kdp.PutKeyPress(HP9825Key.Store);
             kdp.PutKeyPresses("list", TimeSpan.FromSeconds(1));
             kdp.PutKeyPress(HP9825Key.Execute);
-
-            kdp.PutKeyPress(HP9825Key.Run, false, TimeSpan.FromSeconds(15));
         }
 
         private void TestCalcVars(KeyboardDisplayPrinterDevice kdp)
