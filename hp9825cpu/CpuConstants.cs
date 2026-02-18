@@ -144,7 +144,7 @@ namespace HP9825CPU
             new CmdStructure(0b0_111_001_000_000_000, MaskAll, "MWA"),
             new CmdStructure(0b0_111_001_010_000_000, MaskAll, "FXA"),
             new CmdStructure(0b0_111_001_101_000_000, MaskAll, "NRM"),
-            new CmdStructure(0b0_111_101_101_000_000, MaskAll, "NRY"),
+            new CmdStructure(0b0_111_101_101_000_000, MaskAll, "MRY"),
             new CmdStructure(0b0_111_101_101_100_001, MaskAll, "MLY"),
             new CmdStructure(0b0_111_101_100_100_001, MaskAll, "DRS"),
             new CmdStructure(0b0_111_101_100_000_000, MaskAll, "MRX"),

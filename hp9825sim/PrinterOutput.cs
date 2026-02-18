@@ -51,7 +51,7 @@ namespace HP9825Simulator
                     {
                         p.DrawString(pos.Move(1,0), line.PadRight(16), 0);
                     }
-                    p.DrawChar(pos.Move(16,0), ' ', 0);
+                    p.DrawChar(pos.Move(17,0), ' ', 0);
                 }
                 else
                 {

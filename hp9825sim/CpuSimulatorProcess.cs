@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Reflection.Metadata;
 using System.Threading.Tasks;
 using System.Transactions;
@@ -106,12 +107,11 @@ namespace HP9825Simulator
 
             kdp.PutKeyPress(HP9825Key.PrintAll, false); // request printout!
             //TestHellorld(kdp);
-            TestCalc(kdp);
+            //TestCalc(kdp);
             //TestCalc2(kdp);
-            //TestProgram(kdp);
+            //TestCalcVars(kdp);
+            TestProgram(kdp);
 
-            kdp.DisplayChanged += DebugDisplayChanged;
-            
             devices.Add(0, kdp);
 
             // memory.BackingMemory[32] = 0xE821;  // JMP *+1,I
@@ -137,8 +137,13 @@ namespace HP9825Simulator
             //Simulator.SetBreakPoint(Convert.ToInt32("10070", 8));   // "process the key" call
             // Simulator.SetBreakPoint(Convert.ToInt32("11405", 8));   // pre-"turn on display"...
             // Simulator.SetBreakPoint(Convert.ToInt32("13430", 8));   // pre-"turn on display"...
+            // Simulator.SetBreakPoint(Convert.ToInt32("14265", 8));   // Start of FDV code...
+            //Simulator.SetBreakPoint(Convert.ToInt32("4703", 8));   // real number output?...
+            //Simulator.SetBreakPoint(Convert.ToInt32("15073", 8));   // Error (LDB ...-> EXE B)
+            //Simulator.SetBreakPoint(Convert.ToInt32("06564", 8));   // Call AADD,I  -> "+" operation in interpreter.
+            //Simulator.SetBreakPoint(Convert.ToInt32("15041", 8));   // exponent update post operation...
 
-            Simulator.SetMemoryBreakpoint(Convert.ToInt32("00563", 8)); // handler address
+            //Simulator.SetMemoryBreakpoint(Convert.ToInt32("00563", 8)); // handler address
             //Simulator.SetMemoryBreakpoint(Convert.ToInt32("11613", 8)); // break on all access to ".WMOD" flags...
             
             // Simulator.SetMemoryBreakpoint(Convert.ToInt32("77533", 8)); // break on all access to address buffers...
@@ -167,6 +172,34 @@ namespace HP9825Simulator
             kdp.PutKeyPress(HP9825Key.Run, false, TimeSpan.FromSeconds(15));
         }
 
+        private void TestCalcVars(KeyboardDisplayPrinterDevice kdp)
+        {
+            kdp.PutKeyPresses("fxd 8", TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Execute);
+            // kdp.PutKeyPresses("123.345" , TimeSpan.FromSeconds(2));
+            // kdp.PutKeyPress(HP9825Key.Execute);
+            // kdp.PutKeyPresses("123.345e1" , TimeSpan.FromSeconds(2));
+            // kdp.PutKeyPress(HP9825Key.Execute);
+            // kdp.PutKeyPresses("123.345e-1" , TimeSpan.FromSeconds(2));
+            // kdp.PutKeyPress(HP9825Key.Execute);
+            // kdp.PutKeyPresses("-123.345" , TimeSpan.FromSeconds(2));
+            // kdp.PutKeyPress(HP9825Key.Execute);
+            // kdp.PutKeyPresses("-123.345e1" , TimeSpan.FromSeconds(2));
+            // kdp.PutKeyPress(HP9825Key.Execute);
+            // kdp.PutKeyPresses("0.1234+0.9" , TimeSpan.FromSeconds(2));
+            //kdp.PutKeyPresses("-12.345e-2" , TimeSpan.FromSeconds(2));
+            kdp.PutKeyPresses("-12.345e-2→B; 34e-1→C" , TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Execute);
+            //kdp.PutKeyPresses("-1.234e2→B" , TimeSpan.FromSeconds(2));
+            //kdp.PutKeyPress(HP9825Key.Execute);
+            //kdp.PutKeyPress(HP9825Key.A, true, TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Power, true, TimeSpan.FromSeconds(2)); // root.
+            //kdp.PutKeyPresses("(BB+CC)");
+            kdp.PutKeyPresses("(CC+BB)", TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Execute);
+        }
+            
+
         private void TestCalc2(KeyboardDisplayPrinterDevice kdp)
         {
             kdp.PutKeyPress(HP9825Key.Number1, false, TimeSpan.FromSeconds(2));
@@ -180,7 +213,7 @@ namespace HP9825Simulator
             kdp.PutKeyPresses("fxd 5", TimeSpan.FromSeconds(2));
             kdp.PutKeyPress(HP9825Key.Execute);
             kdp.PutKeyPress(HP9825Key.Number5, false, TimeSpan.FromSeconds(2));
-            kdp.PutKeyPress(HP9825Key.Asterisk);
+            kdp.PutKeyPress(HP9825Key.Slash);
             kdp.PutKeyPress(HP9825Key.Pi, false, TimeSpan.FromSeconds(2));
             kdp.PutKeyPress(HP9825Key.Execute);
         }
@@ -212,14 +245,6 @@ namespace HP9825Simulator
             kdp.PutKeyPress(HP9825Key.O, true);
 
             kdp.PutKeyPress(HP9825Key.Execute, false);
-        }
-
-        private void DebugDisplayChanged(object? sender, EventArgs e)
-        {
-            var dev = sender as KeyboardDisplayPrinterDevice;
-            if (dev==null)
-                return;
-            //Debug.WriteLine("{2,18} Display Update   [{0}] [{1}]", dev.RunLight ? '*' : ' ', dev.Display, dev.System?.RunTime);
         }
 
         private CpuSimulator? Simulator;
