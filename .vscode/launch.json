@@ -17,6 +17,17 @@
             "stopAtEntry": false
         },
         {
+            "name": "launch hp9825dasm",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/bin/Debug/hp9825dasm.dll",
+            "args": ["private/hp9825a-system.bin", "private/system-rom.map", "-hl", "-um"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
+        },
+        {
             "name": "launch hp9825util",
             "type": "coreclr",
             "request": "launch",

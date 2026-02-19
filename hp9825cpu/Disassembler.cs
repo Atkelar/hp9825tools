@@ -17,7 +17,9 @@ namespace HP9825CPU
             return -1;
         }
 
-        public static AssemblyLine Disassemble(int opCode, int baseAddress, string? label = null,  string? comment=null, bool includeDefaults = false)
+        public delegate string? LabelForAddress(int baseAddress, int targetAddress);
+
+        public static AssemblyLine Disassemble(int opCode, int baseAddress, string? label = null,  string? comment=null, bool includeDefaults = false, LabelForAddress? labelForAddress = null)
         {
             foreach (var m in CpuConstants.Commands)
             {
@@ -119,7 +121,18 @@ namespace HP9825CPU
                             if (maybeReg && target >= 0 && target < CpuConstants.RegisterNames.Length)
                                 operand = CpuConstants.RegisterNames[target];
                             else
-                                operand = Convert.ToString(target, 8);
+                            {
+                                var lString = labelForAddress?.Invoke(baseAddress, target);
+                                if(lString == null && Math.Abs(target - baseAddress) <= 16)
+                                {
+                                    if(target == baseAddress)
+                                        operand = "*";
+                                    else
+                                        operand = string.Format("*{0}{1}", target > baseAddress ? "+" : "-", Math.Abs(target - baseAddress));
+                                }
+                                else
+                                    operand = lString ?? Convert.ToString(target, 8);
+                            }
                             break;
                     }
 

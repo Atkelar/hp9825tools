@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../CommandLineUtils/CommandLineUtils.csproj" />
+    <ProjectReference Include="../hp9825cpu/hp9825cpu.csproj" />
+  </ItemGroup>
+
 </Project>

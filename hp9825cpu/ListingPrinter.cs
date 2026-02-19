@@ -163,6 +163,11 @@ namespace HP9825CPU
             return 0;
         }
 
+        public string GetFormattedAddress(int address, bool includeTypeCharacter)
+        {
+            return Format.FormatWord(address, !_Is16Bit, includeTypeCharacter);
+        }
+
         private int WriteAddress(int? address)
         {
             if (Format.IncludeAddress)

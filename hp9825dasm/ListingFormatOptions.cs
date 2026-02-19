@@ -3,7 +3,7 @@ using CommandLineUtils;
 using System.Collections;
 using System;
 
-namespace HP9825Assembler
+namespace HP9825Disassembler
 {
     public class ListingFormatOptions
     {

@@ -33,7 +33,7 @@ namespace HP9825CPU
 
         public bool IncludeValues { get; set; } = true;
 
-        public string FormatWord(int? word, bool is15BitAddress = false)
+        public string FormatWord(int? word, bool is15BitAddress = false, bool includeTypeCharacter = false)
         {
             if (!word.HasValue || word < 0 || word > 0xFFFF)
                 return new string(' ', WordWidth(is15BitAddress));
@@ -42,14 +42,14 @@ namespace HP9825CPU
             {
                 case NumberFormatType.Octal:
                     var temp = ("000000" + Convert.ToString(word.Value, 8));
-                    return temp.Substring(temp.Length - (is15BitAddress ? 5 : 6));
+                    return temp.Substring(temp.Length - (is15BitAddress ? 5 : 6)) + (includeTypeCharacter ? "B": string.Empty);
                 case NumberFormatType.Hex:
-                    return word.Value.ToString("x4");
+                    return word.Value.ToString("x4") + (includeTypeCharacter ? "H": string.Empty);
                 case NumberFormatType.Decimal:
                     return word.Value.ToString("00000");
                 case NumberFormatType.Binary:
                     temp = ("0000000000000000" + Convert.ToString(word.Value, 2));
-                    return temp.Substring(temp.Length - (is15BitAddress ? 15 : 16));
+                    return temp.Substring(temp.Length - (is15BitAddress ? 15 : 16)) + (includeTypeCharacter ? "N": string.Empty);
             }
             throw new System.InvalidOperationException("Unknown number format?!");
         }
