@@ -1,4 +1,4 @@
-      HDR HP9825A RAM Checker, by Atkelar
+      HED HP9825A RAM Checker, by Atkelar
 *
 * Boot location - forwart jump to actual boot code, past the constant list.
 *
@@ -192,12 +192,12 @@ WLP1  PWC A,I             push word A to C
       DSZ B               test for "block done"
       JMP WLP1            not yet.
       JSM DSPR!           add an "r" to the display output.
-      JSM DLY!            * delay a bit so we absolutely had a refresh cycle...
-      JSM DLY!            * delay a bit so we absolutely had a refresh cycle...
+      JSM DLY!            delay a bit so we absolutely had a refresh cycle...
+      JSM DLY!            delay a bit so we absolutely had a refresh cycle...
       LDA IV              all words are set to current "pattern"... set up for read back loop...
       STA C
       LDB RTBS
-RLP1  WWC A,I             * pull word from C to A
+RLP1  WWC A,I             pull word from C to A
       CPA D               KEY POINT: same word read as writen?
       JMP NXWD
 * this is wwhere we need to set all bits in W that differ between A and D...
@@ -206,6 +206,8 @@ RLP1  WWC A,I             * pull word from C to A
       LDB D
 * also, loop counting is out... unroll the 16-bit comparisons. A will end up with only
 * the bits set that are different
+* NOTE: this is basically a "hand rolled" 16-bit "A = A XOR B"... The HP CPU doesn't
+*       have a built in XOR though. Or I completely missed it!
 * compare strategy: highest bit in A != B, force bit set in A, RBR/RAR 1 - 16 times!
 * SAP/SBP - skip if positive (b15=0), SAM/SBM - skip if minus (b15=1)
       SAM *+3             A bit non zero?
@@ -376,13 +378,13 @@ HLT   LDB M8
 *
 *   control the RUN light...
 *
-RUNON LDA B10             * Run Light on.
+RUNON LDA B10             Run Light on.
       STA R5
       RET 1
-RUNOF LDA B20             * Run Light off.
+RUNOF LDA B20             Run Light off.
       STA R5
       RET 1
-RUNXX LDA B30             * TOGGLE Run Light
+RUNXX LDA B30             TOGGLE Run Light
       STA R5
       RET 1
 *
@@ -527,7 +529,8 @@ DSPR! LDA RDCHR
 *  entry: A => address of message
 *         B => number of chars
 * exit: message + space pushed to display.
-DISP! SAP *+1,S           * set A(15) bit for stack op..
+*
+DISP! SAP *+1,S           set A(15) bit for stack op..
       STA C
 *
 *  DSP code...

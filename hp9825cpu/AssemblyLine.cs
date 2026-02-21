@@ -177,13 +177,13 @@ namespace HP9825CPU
             public override void CreateOutput(ListingPrinter target)
             {
                 // print first if we want it
-                target.PrintSourceLine(Address, null, null, "HDR", Header, null, true, IsFromMacro);
+                target.PrintSourceLine(Address, null, null, "HED", Header, null, true, IsFromMacro);
                 target.SetHeadline(Header);
             }
 
             public override string Beautified()
             {
-                return FormatCodeLine(null, "HDR", Header, null, null);
+                return FormatCodeLine(null, "HED", Header, null, null);
             }
 
         }
