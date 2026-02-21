@@ -10,4 +10,5 @@ filename=$(basename ${inputfile})
 dotnet run --project:hp9825utils -- ci private/rom.bin -hl -ovr -n
 dotnet run --project:hp9825asm -- "$inputfile" --fromaddress 0 --length 12288 --Beautyfile "private/$filename.out" --fmt:mixedcase --output "private/$filename.bin" --listing "private/$filename.asc" --crossref "private/$filename.xrf" -lh
 dotnet run --project:hp9825utils -- mi private/rom.bin "private/$filename.bin" -hl -in:hl --reverse --negate --targetoffset 0 --targetsize 16384 
+# dotnet run --project:hp9825utils -- mi private/RAMChecker-2.bin "private/RAMChecker-2-out.bin" -hl -in:hl --reverse --negate --targetoffset 0 --targetsize 16384 
 

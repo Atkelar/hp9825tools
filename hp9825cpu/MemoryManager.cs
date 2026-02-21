@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.VisualBasic;
 
 namespace HP9825CPU
 {
@@ -45,6 +46,22 @@ namespace HP9825CPU
             return MemoryType.Missing;
         }
 
+        /// <summary>
+        /// Adds a simulated memory error to the system. Note: multiple specas are cumulative!
+        /// </summary>
+        /// <param name="startAddess">First affected word.</param>
+        /// <param name="endAddress">Last affected word.</param>
+        /// <param name="bitMask">The affected bits (1 = faulty, 0 = working)</param>
+        /// <param name="mode">The type of fault to simulate.</param>
+        public void AddFault(int startAddess, int endAddress, int bitMask, MemoryFaultMode mode)
+        {
+            if ((bitMask & 0xFFFF)!=0)
+            {
+                _Faults ??= new List<MemoryFaultDefinition>();
+                _Faults.Add(new MemoryFaultDefinition(startAddess, endAddress, bitMask, mode));
+            }
+        }
+
         public int this[int address]
         {
             get 
@@ -57,7 +74,20 @@ namespace HP9825CPU
                         return 0xFFFF;
                     case MemoryType.Rom:
                     case MemoryType.Ram:
-                        return BackingMemory[address];
+                        MemoryFaultDefinition ? def;
+                        var value = BackingMemory[address];
+                        if (_Faults != null)
+                        {
+                            for(int i = 0; i< _Faults.Count;i++)
+                            {
+                                def = _Faults[i];
+                                if (def.FirstAddress <= address && def.LastAddress >= address)
+                                {
+                                    value = def.ApplyToValue(value);
+                                }
+                            }
+                        }
+                        return value;
                 }
                 throw new NotImplementedException();
             }
@@ -80,7 +110,8 @@ namespace HP9825CPU
         
         private List<MemoryRange> _RamRanges = new List<MemoryRange>();
         private List<MemoryRange> _RomRanges = new List<MemoryRange>();
-       
+        private List<MemoryFaultDefinition>? _Faults = null;
+
         public Memory BackingMemory { get; private set; }
         public bool Use16Bit { get; internal set; }
     }

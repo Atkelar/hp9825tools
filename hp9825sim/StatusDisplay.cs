@@ -56,7 +56,7 @@ namespace HP9825Simulator
 
                 var prt = new PrinterOutput(dev);
                 prt.Position = new Location(40,7);
-                prt.Size = new Size(prt.Size.Width, 7);
+                prt.Size = new Size(prt.Size.Width, 12);
                 prt.Show();
                 AddChild(prt);
             }

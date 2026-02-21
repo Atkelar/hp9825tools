@@ -208,6 +208,8 @@ namespace CommandLineUtils
             return 0;
         }
 
+        private VerbosityLevel RequestedVerbosity = VerbosityLevel.Normal; 
+
         public async Task<int> Run(string[] args)
         {
             if (_Command == null)
@@ -219,13 +221,7 @@ namespace CommandLineUtils
                 cmd.Prepare(true);
 
                 string? helpPage = await cmd.Parse(args);
-                if (Output == null)
-                {
-                    var x = new ConsoleBasedOutput();
-                    x.Prepare(VerbosityLevel.Normal);
-                    this.OutputTo(x);
-                }
-                cmd.SetOutput(Output!);
+                cmd.SetOutput(EnsureOutput());
                 if (BannerMessage != null)
                 {
                     Output?.WriteLine(VerbosityLevel.Normal, BannerMessage);
@@ -239,11 +235,13 @@ namespace CommandLineUtils
             }
             catch (ReturnCodeException ex)
             {
+                EnsureOutput();
                 Output?.WriteLine(ex.IsNonError ? VerbosityLevel.Normal : VerbosityLevel.Errors, ex.Message);
                 return ex.Code;
             }
             catch(Exception ex)
             {
+                EnsureOutput();
                 Output?.WriteLine(ReturnCode.UhandledError.ErrorMessageTemplate, ex.Message);
                 
 #if DEBUG
@@ -252,6 +250,17 @@ namespace CommandLineUtils
                 return ReturnCode.UhandledError.Code;
             }
             return ReturnCode.Success.Code; 
+        }
+
+        private OutputHandlerBase EnsureOutput()
+        {
+            if (Output == null)
+            {
+                var x = new ConsoleBasedOutput();
+                x.Prepare(VerbosityLevel.Normal);
+                this.OutputTo(x);
+            }
+            return Output;
         }
 
         private string? BannerMessage = null;

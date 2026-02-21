@@ -428,7 +428,7 @@ namespace HP9825CPU
                         if (bp.IsEnabled && bp.OnWrite)
                             _memBreakHit = bp;
                     }
-                    Memory[rValue] = PC;
+                    WriteToAbsoluteAddress(rValue, PC);
                     WriteRegister(CpuRegister.R, rValue);
                     return InstructionResult.TicksAbsolute(ReadMemoryCycles * (_MeasureIndirections + 1) + WriteMemoryCycles + 5 + _MeasureTicks, value);
                 }
@@ -519,24 +519,31 @@ namespace HP9825CPU
                 if (bp.IsEnabled && bp.OnRead)
                     _memBreakHit = bp;
             }
-            int nextBase = Memory[rValue];
-            rValue--;
-            if (rValue < 0)
+            int nextBase;
+            if(!ReadFromAbsoluteAddress(rValue, out nextBase))
             {
-                Fail("RET caused stack underflow!");
+                Fail("RET stack read error!");
             }
             else
             {
-                WriteRegister(CpuRegister.R, rValue);
-                if ((n &0x20)!=0)
-                    n = -32 + (n & 0x1F);    // make sure we get the negative part...
-                if (pop)        // interrupt handling: TODO!
+                rValue--;
+                if (rValue < 0)
                 {
-                    if (this.IODeviceInterruptStack[0].InterruptedFrom != InterruptLevel.None)
-                    {   // we have something to pop!
-                        WriteRegister(CpuRegister.PA, IODeviceInterruptStack[0].SavedPA);
-                        IODeviceInterruptStack[0]= IODeviceInterruptStack[1];
-                        IODeviceInterruptStack[1].InterruptedFrom = InterruptLevel.None;
+                    Fail("RET caused stack underflow!");
+                }
+                else
+                {
+                    WriteRegister(CpuRegister.R, rValue);
+                    if ((n &0x20)!=0)
+                        n = -32 + (n & 0x1F);    // make sure we get the negative part...
+                    if (pop)        // interrupt handling: TODO!
+                    {
+                        if (this.IODeviceInterruptStack[0].InterruptedFrom != InterruptLevel.None)
+                        {   // we have something to pop!
+                            WriteRegister(CpuRegister.PA, IODeviceInterruptStack[0].SavedPA);
+                            IODeviceInterruptStack[0]= IODeviceInterruptStack[1];
+                            IODeviceInterruptStack[1].InterruptedFrom = InterruptLevel.None;
+                        }
                     }
                 }
             }
@@ -1038,7 +1045,7 @@ namespace HP9825CPU
             int address = ReadRegister(counterReg);
 
             // TODO: Check if the read of a byte sets the upper targget bits to zero? Currently assuming "set null".
-            //int value = ReadRegister(reg);
+            // int value = ReadRegister(reg);
             int value = 0;
 
             // here, the fun begins... addressing in 15/16 bit mode is quite different...

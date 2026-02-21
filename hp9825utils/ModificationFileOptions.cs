@@ -28,7 +28,7 @@ namespace HP9825Utils
 
         internal void RegisterErrors(ReturnCodeHandler reg)
         {
-            Errors = reg.Register<ModificationRelatedErrors>(20);
+            Errors = reg.Register<ModificationRelatedErrors>(30);
         }
 
         private ReturnCodeGroup<ModificationRelatedErrors>? Errors;

@@ -828,7 +828,7 @@ namespace HP9825CPU
                                 }
                                 catch (Exception)
                                 {
-                                    throw from.Error(AssemblerErrorCodes.InvalidNumeral, "Invalid octal constant: {0}", part);
+                                    throw from.Error(AssemblerErrorCodes.InvalidNumeral, "Invalid octal constant or label: {0}", part);
                                 }
                                 nBase = 8;
                             }
@@ -840,7 +840,7 @@ namespace HP9825CPU
                                 }
                                 catch (Exception)
                                 {
-                                    throw from.Error(AssemblerErrorCodes.InvalidNumeral, "Invalid decimal constant: {0}", part);
+                                    throw from.Error(AssemblerErrorCodes.InvalidNumeral, "Invalid decimal constant or label: {0}", part);
                                 }
                             }
                             if (negate)

@@ -33,7 +33,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/bin/Debug/hp9825utils.dll",
-            "args": ["id", "test.bin"],
+            "args": ["mi", "private/RAMChecker-2-out.bin", "private/RAMChecker-2.bin", "-hl", "-in:hl", "--reverse", "--negate", "--targetoffset", "0", "--targetsize", "16384" ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
             "stopAtEntry": false
@@ -44,8 +44,8 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/bin/Debug/hp9825asm.dll",
-            "args": ["--help"],
-            "cwd": "${workspaceFolder}/hp9825asm",
+            "args": ["private/RAMChecker.asm", "-lh", "-len", "12288", "-o", "private/RAMChecker-2.bin"],
+            "cwd": "${workspaceFolder}",
             "console": "internalConsole",
             "stopAtEntry": false
         },

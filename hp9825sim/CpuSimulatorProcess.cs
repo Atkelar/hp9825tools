@@ -91,18 +91,18 @@ namespace HP9825Simulator
         protected override async Task RunNow()
         {
             MemoryManager memory = new MemoryManager();
-            memory.SetRam(new MemoryRange(0x7000, 0x7FFF));
+            memory.SetRam(new MemoryRange(0x5000, 0x7FFF));
             memory.SetRom(new MemoryRange(0, 12288));
 
             // TODO: this is just test code...
-            using (var fhigh=File.OpenRead("private/hp9825a-system-high.bin"))
-            {
-                using(var flow=File.OpenRead("private/hp9825a-system-low.bin"))
-                {
-            // using (var fhigh=File.OpenRead("private/RAMChecker.asm.high.bin"))
+            // using (var fhigh=File.OpenRead("private/hp9825a-system-high.bin"))
             // {
-            //     using(var flow=File.OpenRead("private/RAMChecker.asm.low.bin"))
+            //     using(var flow=File.OpenRead("private/hp9825a-system-low.bin"))
             //     {
+            using (var fhigh=File.OpenRead("private/RAMChecker-2.high.bin"))
+            {
+                using(var flow=File.OpenRead("private/RAMChecker-2.low.bin"))
+                {
                     memory.BackingMemory.LoadDual8Bit(new BinaryReader(flow), new BinaryReader(fhigh), 0, 12288);
                 }
             }
@@ -131,6 +131,13 @@ namespace HP9825Simulator
             // memory.BackingMemory[0x2001] = 0xF020; // TCA
             // build the simulator...
             Simulator = new CpuSimulator(memory, devices);
+
+            //Simulator.SetBreakPoint(Convert.ToInt32("572", 8));   // mem check loop
+            Simulator.Memory.AddFault(Convert.ToInt32("76000", 8), Convert.ToInt32("77777", 8), 
+                0b1000_0000_0100_0000, MemoryFaultMode.Toggle);
+            Simulator.Memory.AddFault(Convert.ToInt32("56000", 8), Convert.ToInt32("56123", 8), 
+                0b0000_0001_1000_0000, MemoryFaultMode.StuckOff);
+
 
             //Simulator.SetBreakPoint(Convert.ToInt32("11467", 8));   // keyboard table branch!
             //Simulator.SetBreakPoint(Convert.ToInt32("6327", 8));   // stack parser...

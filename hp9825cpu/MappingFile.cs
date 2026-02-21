@@ -193,7 +193,18 @@ namespace HP9825CPU
                             if (explicitLocation.HasValue && currentSection != null)
                                 currentSection._CurrentAddress = explicitLocation.Value;
                             else
-                                ctx.Warn(MappingFileErrorCode.LabelIsInvalid, "No label and no type?!");
+                            {
+                                if (currentSection != null && currentSection.HasOpenBlockComment)
+                                {
+                                    currentSection.AppendLabel(explicitLocation, label, null, 1, null, null, null, null);
+                                }
+                                else
+                                {
+                                    ctx.Warn(MappingFileErrorCode.LabelIsInvalid, "No label and no type?! Incrementing address.");
+                                    if (currentSection != null)
+                                        currentSection._CurrentAddress++;
+                                }
+                            }
                             continue;
                         }
                         else
@@ -281,15 +292,36 @@ namespace HP9825CPU
                         }
                         if (currentSection == null)
                             throw ctx.Error(MappingFileErrorCode.MissingSection, $"The label {label} is missing a parent section!");
+                        if (label != null && instance.KnowsLabel(label))
+                            ctx.Warn(MappingFileErrorCode.DuplicateLabel, $"The label {label} is declared multiple times! Unpredictable results may occur!");
+                        var def = instance.DefinitionForRange(explicitLocation.GetValueOrDefault(currentSection._CurrentAddress), length);
+                        if (def != null)
+                            ctx.Warn(MappingFileErrorCode.LabelOverlapping, $"The label {label} deinfed {instance.FormatAddress(explicitLocation.GetValueOrDefault(currentSection._CurrentAddress))} overlaps with {def.Label} at {instance.FormatAddress(def.Location)}-{instance.FormatAddress(def.EndLocation)}!");
+                        
                         currentSection.AppendLabel(explicitLocation, label, labelType, length, dataTypeKey, relativeAddress, aliases, inlineComment);
                         continue;
                     }
-                    ctx.Warn(MappingFileErrorCode.UnknownDirective, $"Directive unknown, ignoring line: {line}");
+                    //ctx.Warn(MappingFileErrorCode.UnknownDirective, $"Directive unknown, ignoring line: {line}");
                 }
             }
             if (instance == null)
                 throw ctx.Error(MappingFileErrorCode.MissingIntro, "The .MAPPING line is missing!");
             return instance;
+        }
+
+        private LabelDefinition? DefinitionForRange(int address, int length)
+        {
+            int lookTo = address + length - 1;
+            foreach(var s in _Sections)
+            {
+                if (s.From <= lookTo && s.To >= address)
+                {
+                    var def = s.GetOverlappingLabelDefinition(address, length);
+                    if (def != null)
+                        return def;
+                }
+            }
+            return null;
         }
 
         private static int ParseNumber(ParseContext ctx, string value)
@@ -764,6 +796,8 @@ namespace HP9825CPU
             public int From { get; set; }
             public int To { get; set; }
             public MappingRegionType Type { get; }
+            public bool HasOpenBlockComment => (_CommentCollector?.Count ?? 0)>0;
+
             public string? Title;
 
             public MappingSection(int from, int to, MappingRegionType type, string? title, MappingFile parent)
@@ -1023,6 +1057,17 @@ namespace HP9825CPU
                 _Definitions.Add(x);
                 if (label != null && !_indexBaName.ContainsKey(label))
                     _indexBaName.Add(label, x);
+            }
+
+            internal LabelDefinition? GetOverlappingLabelDefinition(int address, int length)
+            {
+                int lookTo = address + length - 1;
+                foreach (var def in _Definitions)
+                {
+                    if (address <= def.EndLocation && lookTo >= def.Location)   // overlap!
+                        return def;
+                }
+                return null;
             }
 
             internal LabelDefinition? GetLabelDefinition(int address)
@@ -1294,6 +1339,7 @@ namespace HP9825CPU
             public int? ExplicitLocation { get; }
             public int Location { get; }
             public int Length { get; }
+            public int EndLocation { get; }
 
             public LabelSectionType Type { get; private set; }
             public LabelSectionType? ExplicitType { get; }
@@ -1308,6 +1354,7 @@ namespace HP9825CPU
                 this.ExplicitLocation = explicitLocation;
                 this.Location = loc;
                 this.Length = length;
+                this.EndLocation = this.Location + this.Length - 1;
                 Type = type;
                 ExplicitType = explicitType;
                 DataTypeKey = dataTypeKey;

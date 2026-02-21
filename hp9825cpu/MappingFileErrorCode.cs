@@ -16,5 +16,7 @@ namespace HP9825CPU
         LabelIsInvalid = 12,
         InvalidOptionValue = 13,
         ValueOutOfRange = 14,
+        DuplicateLabel = 15,
+        LabelOverlapping = 16,
     }
 }

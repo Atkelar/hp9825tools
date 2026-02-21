@@ -88,6 +88,7 @@ namespace HP9825Utils
         protected override bool BuildReturnCodes(ReturnCodeHandler reg)
         {
             Modify!.RegisterErrors(reg);
+            Input!.RegisterErrors(reg);
             Errors = reg.Register<MergeErrors>();
             return base.BuildReturnCodes(reg);
         }

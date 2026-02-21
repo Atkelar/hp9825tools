@@ -33,3 +33,11 @@ buildandpack "linux-arm"
 buildandpack "osx-x64"
 
 rm -r bin/Release
+
+./runasm RAMChecker/RAMChecker.asm -hl -len 12288 -o bin/RAMChecker-out.bin -b private/RAMCHecker.nice.asm
+./runutil ci bin/RAMChecker.bin -hl -s 32768 -n
+./runutil mi bin/RAMChecker.bin bin/RAMChecker-out.bin -hl -in:hl --reverse --negate --targetoffset 0 --targetsize 16384
+pushd bin
+zip "RAMChecker-$version.zip" RAMChecker*.bin
+popd
+mv "bin/RAMChecker-$version.zip" BuildOutput

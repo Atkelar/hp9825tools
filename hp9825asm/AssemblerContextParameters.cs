@@ -34,7 +34,7 @@ namespace HP9825Assembler
         [Argument("in", "Input", HelpText = "The input file to assemble. Assumes .asm file extension.", Positional = 1, Required = true)]
         public string? InputFile { get; set; } = null;
 
-        [Argument("lh", "LowHigh", HelpText = "Use low/high output files for EPROM programming.")]
+        [Argument("hl", "UseHighLow", HelpText = "Use high/low output files for EPROM programming.")]
         public bool UseLowHighFiles { get; set; }
 
         [Argument("c", "Condition", HelpText = "Sets the condition for assembling to either N or Z (see IFN and IFZ pseudo code!).")]

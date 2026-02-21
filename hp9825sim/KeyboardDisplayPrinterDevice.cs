@@ -40,6 +40,7 @@ namespace HP9825Simulator
             _CurrentDispay = new string(' ', _DisplayLength);
             _CurrentCursorDisplay = new string(' ', _DisplayLength);
             _DisplayBuffer = new char[_DisplayLength];
+            Array.Fill(_DisplayBuffer, ' ');
             _IsCursor = new bool[_DisplayLength];
             _DefaultKeyDelay = TimeSpan.FromMilliseconds(100);
             _LastKeyWasPressed = TimeSpan.Zero;
