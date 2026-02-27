@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Microsoft.VisualBasic;
 
@@ -11,39 +12,38 @@ namespace HP9825CPU
         {
             Use16Bit = use16Bit;
             BackingMemory = Memory.MakeMemory(use16Bit);
+            _Mapping = new MemoryType[BackingMemory.Length];
+            for(int i = 0;i<_Mapping.Length;i++)
+                _Mapping[i] = MemoryType.Missing;
             if (workingArea != null)
-                _RamRanges.Add(workingArea);
+                SetRam(workingArea);
         }
 
         public void SetRam(MemoryRange range)
         {
             if (range.End >= BackingMemory.Length)
                 throw new ArgumentOutOfRangeException(nameof(range), range.End, "Momory range is too large for the backing memory!");
-            foreach(var r in _RomRanges)
-                if (r.Overlaps(range))
-                    throw new InvalidOperationException(string.Format("Cannot set memory to be RAM, is alread ROM. {0}-{1} conflicts with {2}-{3}", range.Start, range.End, r.Start, r.End));
-            // ram *can* legally overlap...
-            _RamRanges.Add(range);
+            for(int ofs = range.Start; ofs <= range.End;ofs++)
+                if (_Mapping[ofs] != MemoryType.Missing) // detect overlapping same type too!
+                    throw new InvalidOperationException(string.Format("Cannot set memory at {0}-{1} to be RAM, is alread {2} at {3}.", range.Start, range.End, _Mapping[ofs], ofs));
+            for(int ofs = range.Start; ofs <= range.End;ofs++)
+                _Mapping[ofs] = MemoryType.Ram;
         }
 
         public void SetRom(MemoryRange range)
         {
             if (range.End >= BackingMemory.Length)
                 throw new ArgumentOutOfRangeException(nameof(range), range.End, "Momory range is too large for the backing memory!");
-            foreach(var r in _RamRanges)
-                if (r.Overlaps(range))
-                    throw new InvalidOperationException(string.Format("Cannot set memory to be RAM, is alread ROM. {0}-{1} conflicts with {2}-{3}", range.Start, range.End, r.Start, r.End));
-            // rom *can* legally overlap...
-            _RomRanges.Add(range);
+            for(int ofs = range.Start; ofs <= range.End;ofs++)
+                if (_Mapping[ofs] != MemoryType.Missing)    // detect overlapping same type too!
+                    throw new InvalidOperationException(string.Format("Cannot set memory at {0}-{1} to be ROM, is alread {2} at {3}.", range.Start, range.End, _Mapping[ofs], ofs));
+            for(int ofs = range.Start; ofs <= range.End;ofs++)
+                _Mapping[ofs] = MemoryType.Rom;
         }
 
         public MemoryType GetTypeFor(int address)
         {
-            if (_RamRanges.Any(x=> address >= x.Start && address <= x.End))
-                return MemoryType.Ram;
-            if (_RomRanges.Any(x=> address >= x.Start && address <= x.End))
-                return MemoryType.Rom;
-            return MemoryType.Missing;
+            return _Mapping[address];
         }
 
         /// <summary>
@@ -60,6 +60,90 @@ namespace HP9825CPU
                 _Faults ??= new List<MemoryFaultDefinition>();
                 _Faults.Add(new MemoryFaultDefinition(startAddess, endAddress, bitMask, mode));
             }
+        }
+
+        public void LoadSystemRomImage(BinaryReader words, bool bigEndian = true)
+        {
+            BackingMemory.Load16Bit(words, 0, 12288, bigEndian);
+            SetRom(new MemoryRange(0, 12288));
+        }
+
+        public void LoadSystemRomImage(BinaryReader fLowBytes, BinaryReader fHighBytes)
+        {
+            BackingMemory.LoadDual8Bit(fLowBytes, fHighBytes, 0, 12288);
+            SetRom(new MemoryRange(0, 12288));
+        }
+
+        private void TranslateRomOptions(OptionRom wellknown, out int address, out int length)
+        {
+            length = 1024;  // most roms are...
+            switch(wellknown)
+            {
+                case OptionRom.ExtendedIO:
+                    address = 0x4400;
+                    length = 2048;
+                    break;
+                case OptionRom.Strings:
+                    address = 0x4C00;
+                    break;
+                case OptionRom.AdvancedProgramming:
+                    address = 0x4000;
+                    break;
+                case OptionRom.Matrix:
+                case OptionRom.SystemProgramming:
+                    address = 0x3C00;
+                    break;
+                case OptionRom.Plotter:
+                    address = 0x3800;
+                    break;
+                case OptionRom.GeneralIO:
+                    address = 0x3400;
+                    break;
+                case OptionRom.MassMemory:
+                    address = 0x3000;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(wellknown), wellknown, "The provided well-known ROM value is unknown!");
+            }
+        }
+
+        public void LoadOptionPack(OptionRom wellknown, BinaryReader fLowBytes, BinaryReader fHighBytes)
+        {
+            TranslateRomOptions(wellknown, out int baseAddress, out int length);
+
+            SetRom(new MemoryRange(baseAddress, baseAddress+length-1));
+            BackingMemory.LoadDual8Bit(fLowBytes, fHighBytes, baseAddress, length);
+        }
+
+        public void LoadOptionPack(OptionRom wellknown, BinaryReader fWords, bool bigEndian = true)
+        {
+            TranslateRomOptions(wellknown, out int baseAddress, out int length);
+
+            SetRom(new MemoryRange(baseAddress, baseAddress+length-1));
+            BackingMemory.Load16Bit(fWords, baseAddress, length, bigEndian);
+        }
+
+        public void SetRamConfiguration(RamConfiguration config)
+        {
+            int baseAddress;
+            switch(config)
+            {
+                case RamConfiguration.Ram8k:
+                    baseAddress = 0x7000;
+                    break;
+                case RamConfiguration.Ram16k:
+                    baseAddress = 0x6000;
+                    break;
+                case RamConfiguration.Ram24k:
+                    baseAddress = 0x5000;
+                    break;
+                case RamConfiguration.Ram32k:
+                    baseAddress = 0x4000;
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+            SetRam(new MemoryRange(0x5000, 0x7FFF));
         }
 
         public int this[int address]
@@ -107,9 +191,9 @@ namespace HP9825CPU
                 throw new NotImplementedException();
             }
         }
+
+        private MemoryType[] _Mapping;
         
-        private List<MemoryRange> _RamRanges = new List<MemoryRange>();
-        private List<MemoryRange> _RomRanges = new List<MemoryRange>();
         private List<MemoryFaultDefinition>? _Faults = null;
 
         public Memory BackingMemory { get; private set; }

@@ -91,32 +91,48 @@ namespace HP9825Simulator
         protected override async Task RunNow()
         {
             MemoryManager memory = new MemoryManager();
-            memory.SetRam(new MemoryRange(0x5000, 0x7FFF));
-            memory.SetRom(new MemoryRange(0, 12288));
+            memory.SetRamConfiguration(RamConfiguration.Ram16k);
 
             // TODO: this is just test code...
-            // using (var fhigh=File.OpenRead("private/hp9825a-system-high.bin"))
-            // {
-            //     using(var flow=File.OpenRead("private/hp9825a-system-low.bin"))
-            //     {
-            using (var fhigh=File.OpenRead("private/RAMChecker-2.high.bin"))
+            using (var fhigh=File.OpenRead("private/hp9825a-system-high.bin"))
             {
-                using(var flow=File.OpenRead("private/RAMChecker-2.low.bin"))
+                using(var flow=File.OpenRead("private/hp9825a-system-low.bin"))
                 {
-                    memory.BackingMemory.LoadDual8Bit(new BinaryReader(flow), new BinaryReader(fhigh), 0, 12288);
+            // using (var fhigh=File.OpenRead("private/RAMChecker-2.high.bin"))
+            // {
+            //     using(var flow=File.OpenRead("private/RAMChecker-2.low.bin"))
+            //     {
+                    memory.LoadSystemRomImage(new BinaryReader(flow), new BinaryReader(fhigh));
                 }
             }
+            using (var f=File.OpenRead("private/STRING_T.BIN")) // plug in strings ROM...
+            {
+                memory.LoadOptionPack(OptionRom.Strings, new BinaryReader(f));
+            }
+            using (var f=File.OpenRead("private/ADVPGM_T.BIN")) // plug in strings ROM...
+            {
+                memory.LoadOptionPack(OptionRom.AdvancedProgramming, new BinaryReader(f));
+            }
+            // using (var f=File.OpenRead("private/GENIO_T.BIN")) // plug in general IO ROM...
+            // {
+            //     memory.LoadOptionPack(OptionRom.GeneralIO, new BinaryReader(f));
+            // }
+            
             var devices = new DeviceManager();
             var kdp = new KeyboardDisplayPrinterDevice();
             // TODO: KDP visual...
 
             kdp.PutKeyPress(HP9825Key.PrintAll, false); // request printout!
+            
             //TestHellorld(kdp);
             //TestCalc(kdp);
             //TestCalc2(kdp);
             //TestCalcVars(kdp);
             //TestProgram(kdp);
-            TestCat(kdp);
+            //TestCat(kdp);
+            //TestFunctionKeys(kdp);
+            //TestStrings(kdp);
+            TestMandelbrot(kdp);
 
             devices.Add(0, kdp);
 
@@ -132,11 +148,10 @@ namespace HP9825Simulator
             // build the simulator...
             Simulator = new CpuSimulator(memory, devices);
 
-            //Simulator.SetBreakPoint(Convert.ToInt32("572", 8));   // mem check loop
-            Simulator.Memory.AddFault(Convert.ToInt32("76000", 8), Convert.ToInt32("77777", 8), 
-                0b1000_0000_0100_0000, MemoryFaultMode.Toggle);
-            Simulator.Memory.AddFault(Convert.ToInt32("56000", 8), Convert.ToInt32("56123", 8), 
-                0b0000_0001_1000_0000, MemoryFaultMode.StuckOff);
+            // Simulator.Memory.AddFault(Convert.ToInt32("76000", 8), Convert.ToInt32("77777", 8), 
+            //     0b1000_0000_0100_0000, MemoryFaultMode.Toggle);
+            // Simulator.Memory.AddFault(Convert.ToInt32("56000", 8), Convert.ToInt32("56123", 8), 
+            //     0b0000_0001_1000_0000, MemoryFaultMode.StuckOff);
 
 
             //Simulator.SetBreakPoint(Convert.ToInt32("11467", 8));   // keyboard table branch!
@@ -167,6 +182,60 @@ namespace HP9825Simulator
             await base.RunNow();
 
             // save state?!
+        }
+
+        private void TestMandelbrot(KeyboardDisplayPrinterDevice kdp)
+        {
+            PutProgramLine(kdp, "dim L$[16]");
+            PutProgramLine(kdp, "prt \"starting...\"");
+            PutProgramLine(kdp, "spc 2");
+            PutProgramLine(kdp, "for Y = -7 to 7");
+            PutProgramLine(kdp, "for X = -7 to 8");
+            PutProgramLine(kdp, "X*.1618 → D");
+            PutProgramLine(kdp, "Y*.1429 → E");
+            PutProgramLine(kdp, "D → A");
+            PutProgramLine(kdp, "E → B");
+            PutProgramLine(kdp, "for I=0 to 15");
+            PutProgramLine(kdp, "AA-BB+D → T");
+            PutProgramLine(kdp, "2AB+E → B");
+            PutProgramLine(kdp, "T → A");
+            PutProgramLine(kdp, "if (AA+BB) <= 4; gto \"cont\"");
+            PutProgramLine(kdp, "if I>9; I+7 → I");
+            PutProgramLine(kdp, "L$ & char(48+I) → L$");
+            PutProgramLine(kdp, "20 → I");
+            PutProgramLine(kdp, "\"cont\": next I");
+            PutProgramLine(kdp, "if I<17; L$ & \" \" → L$");
+            PutProgramLine(kdp, "next X");
+            PutProgramLine(kdp, "prt L$");
+            PutProgramLine(kdp, "\"\" → L$");
+            PutProgramLine(kdp, "next Y");
+
+            PutProgramLine(kdp, "spc 2");
+            PutProgramLine(kdp, "prt \"Done!\"");
+
+            kdp.PutKeyPress(HP9825Key.Run);
+        }
+
+        private void PutProgramLine(KeyboardDisplayPrinterDevice kdp, string v)
+        {
+            kdp.PutKeyPresses(v);
+            kdp.PutKeyPress(HP9825Key.Store);
+        }
+
+        private void TestStrings(KeyboardDisplayPrinterDevice kdp)
+        {
+            kdp.PutKeyPresses("dim A$[20];\"hello\"→A$;dsp cap(A$)", TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Execute);
+        }
+
+        private void TestFunctionKeys(KeyboardDisplayPrinterDevice kdp)
+        {
+            kdp.PutKeyPress(HP9825Key.LineFetch, false, TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Function0);
+            kdp.PutKeyPresses("*→R; dspR,\"in.=\",2.54R,\"cm.\"");
+            kdp.PutKeyPress(HP9825Key.Store);
+            kdp.PutKeyPresses("12", TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Function0);
         }
 
         private void TestCat(KeyboardDisplayPrinterDevice kdp)

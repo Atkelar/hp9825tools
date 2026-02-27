@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using CommandLineUtils;
 using CommandLineUtils.Visuals;
+using HP9825CPU;
 
 namespace HP9825Simulator
 {

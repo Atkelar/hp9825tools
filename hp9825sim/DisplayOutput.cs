@@ -1,5 +1,6 @@
 using System;
 using CommandLineUtils.Visuals;
+using HP9825CPU;
 
 namespace HP9825Simulator
 {

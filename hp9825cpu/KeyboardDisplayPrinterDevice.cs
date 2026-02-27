@@ -7,7 +7,7 @@ using System.Runtime.InteropServices.Marshalling;
 using System.Text;
 using HP9825CPU;
 
-namespace HP9825Simulator
+namespace HP9825CPU
 {
     /// <summary>
     /// Simulates the main input/output unit of the HP 9825A: Display (40 char), printer (16 char), and keyboard.
@@ -63,9 +63,9 @@ namespace HP9825Simulator
 
         private readonly TimeSpan CursorTicker = TimeSpan.FromMilliseconds(400);
 
-        private readonly TimeSpan PrintLineDuration = TimeSpan.FromMilliseconds(600);
+        private readonly TimeSpan PrintLineDuration = TimeSpan.FromMilliseconds(333);   // service manual, page 70
 
-        protected override void Reset()
+        protected internal override void Reset()
         {
             // We don't really reset anything in the display;
             // the firmware has to overwrite the line anyhow. 
@@ -80,7 +80,7 @@ namespace HP9825Simulator
             LastPrintedLine = string.Empty;
         }
 
-        protected override int ReadIORegister(int regIndex)
+        protected internal override int ReadIORegister(int regIndex)
         {
             // R5 (1) => status flag.
             // R4 => keyboard code: 0x80 => shift, 0x7F keyboard matrix code of "pressed" key.
@@ -174,7 +174,7 @@ namespace HP9825Simulator
 
         private TimeSpan _LastCursorTick;
 
-        protected override void Tick()
+        protected internal override void Tick()
         {
             if (System == null)
                 return;
@@ -238,7 +238,7 @@ namespace HP9825Simulator
         // System.Text.StringBuilder sbOut = new System.Text.StringBuilder();
         private bool _HasChanged;
 
-        protected override void WriteIORegister(int regIndex, int value)
+        protected internal override void WriteIORegister(int regIndex, int value)
         {
             value = value & 0xFF;   // just in case; we only have an 8 bit connection to the bus!
             // write to register R4 (=index 0) => write to display line.
@@ -374,7 +374,7 @@ namespace HP9825Simulator
             }
         }
 
-        internal void PutKeyPresses(string text, TimeSpan? delayForFirstChar = null, TimeSpan? delayBetweenChars = null)
+        public void PutKeyPresses(string text, TimeSpan? delayForFirstChar = null, TimeSpan? delayBetweenChars = null)
         {
             TimeSpan delay = delayForFirstChar.GetValueOrDefault(DefaultKeyDelay);
             foreach (var c in text)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Channels;
@@ -1169,7 +1170,7 @@ namespace HP9825CPU
         {
             int n = (code & 0xF) + 1;
             int address = ReadRegister(CpuRegister.A);
-            Debug.WriteLine("CRL - {0} - {1}*", Convert.ToString(address, 8), n);
+            //Debug.WriteLine("CRL - {0} - {1}*", Convert.ToString(address, 8), n);
             for(int i = 0;i<n;i++)
             {
                 if (_MemoryBreakpoints.TryGetValue(address, out var bp))
@@ -1190,7 +1191,7 @@ namespace HP9825CPU
             int n = (code & 0xF) + 1;
             int address1 = ReadRegister(CpuRegister.A);
             int address2 = ReadRegister(CpuRegister.B);
-            Debug.WriteLine("XFR - {0} -> {1} - {2}*", Convert.ToString(address1, 8), Convert.ToString(address2, 8), n);
+            //Debug.WriteLine("XFR - {0} -> {1} - {2}*", Convert.ToString(address1, 8), Convert.ToString(address2, 8), n);
             for(int i = 0;i<n;i++)
             {
                 if (_MemoryBreakpoints.TryGetValue(address1, out var bp))
@@ -1220,7 +1221,7 @@ namespace HP9825CPU
             int aReg = ReadRegister(CpuRegister.A);
             int shiftCount = ReadRegister(CpuRegister.B) & 0xF; // note: 0-15 is valid and will be counted.
             FloatingPointNumber ar1 = ReadAR1();
-            Debug.Write(string.Format("MRX - {0} - {1}* - ", ar1, shiftCount));
+            //Debug.Write(string.Format("MRX - {0} - {1}* - ", ar1, shiftCount));
             if (shiftCount > 0)
             {
                 int stuffValue = aReg & 0xF;
@@ -1246,7 +1247,7 @@ namespace HP9825CPU
                     WriteRegister(CpuRegister.SE, lastOut);
                     ar1.PutMantissa(digits);
                     WriteAR1(ar1);
-                    Debug.WriteLine(ar1);
+                    //Debug.WriteLine(ar1);
                 }
             }
             else
@@ -1289,7 +1290,7 @@ namespace HP9825CPU
             // mantissa right shift of AR1...
             // n-count is 1 in 0 through first/last digits...
             FloatingPointNumber ar1 = ReadAR1();
-            Debug.Write(string.Format("DRS - {0} - ", ar1));
+            //Debug.Write(string.Format("DRS - {0} - ", ar1));
             int[] digits = ar1.GetMantissa();
             int lastOut=digits[11];
             for(int digit = 11; digit > 0 ; digit--)
@@ -1301,7 +1302,7 @@ namespace HP9825CPU
             WriteRegister(CpuRegister.SE, lastOut);
             ar1.PutMantissa(digits);
             WriteAR1(ar1);
-            Debug.WriteLine(ar1);
+            //Debug.WriteLine(ar1);
             DecimalCarry = false;
             return InstructionResult.Ticks(4*ReadMemoryCycles + 3*WriteMemoryCycles + 14);        
         }
@@ -1311,7 +1312,7 @@ namespace HP9825CPU
             // n-count is 1 rotate A &0xF through first/last digits...
             int aReg = ReadRegister(CpuRegister.A);
             FloatingPointNumber ar2 = ReadAR2();
-            Debug.Write(string.Format("MLY - {0} - ", ar2));
+            //Debug.Write(string.Format("MLY - {0} - ", ar2));
             int stuffValue = aReg & 0xF;
             if (stuffValue > 9)
             {
@@ -1330,7 +1331,7 @@ namespace HP9825CPU
                 WriteRegister(CpuRegister.SE, lastOut);
                 ar2.PutMantissa(digits);
                 WriteAR2(ar2);
-                Debug.WriteLine(ar2);
+                //Debug.WriteLine(ar2);
                 DecimalCarry = false;
             }
 
@@ -1343,7 +1344,7 @@ namespace HP9825CPU
             int aReg = ReadRegister(CpuRegister.A);
             int shiftCount = ReadRegister(CpuRegister.B) & 0xF; // note: 0-15 is valid and will be counted.
             FloatingPointNumber ar2 = ReadAR2();
-            Debug.Write(string.Format("MRY - {0} - {1}* - ", ar2, shiftCount));
+            //Debug.Write(string.Format("MRY - {0} - {1}* - ", ar2, shiftCount));
             if (shiftCount > 0)
             {
                 int stuffValue = aReg & 0xF;
@@ -1369,7 +1370,7 @@ namespace HP9825CPU
                     WriteRegister(CpuRegister.SE, lastOut);
                     ar2.PutMantissa(digits);
                     WriteAR2(ar2);
-                    Debug.WriteLine(ar2);
+                    //Debug.WriteLine(ar2);
                     DecimalCarry = false;
                 }
             }
@@ -1385,7 +1386,7 @@ namespace HP9825CPU
         {
             // normalize AR2...
             FloatingPointNumber ar2 = ReadAR2();
-            Debug.Write(string.Format("NRM - {0} - ", ar2));
+            //Debug.Write(string.Format("NRM - {0} - ", ar2));
             int numShifts = 0;
             int[] digits = ar2.GetMantissa();
             while (digits[0]==0 && numShifts<12)
@@ -1401,7 +1402,7 @@ namespace HP9825CPU
             WriteRegister(CpuRegister.B, numShifts);
             ar2.PutMantissa(digits);
             WriteAR2(ar2);
-            Debug.WriteLine("{0} - {1}*", ar2, numShifts);
+            //Debug.WriteLine("{0} - {1}*", ar2, numShifts);
             DecimalCarry = numShifts > 11;
 
             return InstructionResult.Ticks(numShifts < 12 ? ReadMemoryCycles + numShifts + 17 : ReadMemoryCycles + 63);
@@ -1415,7 +1416,7 @@ namespace HP9825CPU
             var m2 = ar2.GetMantissa();
             // page 105
             int carry = DecimalCarry ? 1 : 0;
-            Debug.Write(string.Format("FXA - {0} - {1} - {2} - ", ar1, ar2, carry));
+            //Debug.Write(string.Format("FXA - {0} - {1} - {2} - ", ar1, ar2, carry));
 
             for(int i = 11; i >=0;i--)
             {
@@ -1433,7 +1434,7 @@ namespace HP9825CPU
             DecimalCarry = carry > 0;
             ar2.PutMantissa(m2);
             WriteAR2(ar2);
-            Debug.WriteLine("{0} - {1}", ar2, carry);
+            //Debug.WriteLine("{0} - {1}", ar2, carry);
             return InstructionResult.Ticks(4*ReadMemoryCycles + 16);
         }
         private InstructionResult HandleMWA(int code)
@@ -1450,7 +1451,7 @@ namespace HP9825CPU
             var m2 = ar2.GetMantissa();
             // page 105
             int carry = DecimalCarry ? 1 : 0;
-            Debug.Write(string.Format("MWA - {0} - {1:x4} {2}{3}{4}{5} - {6} - ", ar2, b, m1[8],m1[9],m1[10],m1[11] , carry));
+            //Debug.Write(string.Format("MWA - {0} - {1:x4} {2}{3}{4}{5} - {6} - ", ar2, b, m1[8],m1[9],m1[10],m1[11] , carry));
 
             for(int i = 11; i >=0;i--)
             {
@@ -1468,7 +1469,7 @@ namespace HP9825CPU
             DecimalCarry = carry > 0;
             ar2.PutMantissa(m2);
             WriteAR2(ar2);
-            Debug.WriteLine(" - {0} - {1}", ar2, carry);
+            //Debug.WriteLine(" - {0} - {1}", ar2, carry);
             return InstructionResult.Ticks(ReadMemoryCycles + 22);
         }
         private InstructionResult HandleCMX(int code)
@@ -1478,7 +1479,7 @@ namespace HP9825CPU
             var m = ar1.GetMantissa();
             // page 69
             int bNum = 10;
-            Debug.Write(string.Format("CMX - {0} - ", ar1));
+            //Debug.Write(string.Format("CMX - {0} - ", ar1));
             for(int i=11;i>=0;i--)
             {
                 if (bNum < 10 || m[i]!=0)
@@ -1490,7 +1491,7 @@ namespace HP9825CPU
             DecimalCarry = false;
             ar1.PutMantissa(m);
             WriteAR1(ar1);
-            Debug.WriteLine(ar1);
+            //Debug.WriteLine(ar1);
             return InstructionResult.Ticks(4*ReadMemoryCycles + 4*WriteMemoryCycles + 17);
         }
         private InstructionResult HandleCMY(int code)
@@ -1500,7 +1501,7 @@ namespace HP9825CPU
             var m = ar2.GetMantissa();
             // page 69
             int bNum = 10;
-            Debug.Write(string.Format("CMY - {0} - ", ar2));
+            //Debug.Write(string.Format("CMY - {0} - ", ar2));
             for(int i=11;i>=0;i--)
             {
                 if (bNum < 10 || m[i]!=0)
@@ -1512,7 +1513,7 @@ namespace HP9825CPU
             DecimalCarry = false;
             ar2.PutMantissa(m);
             WriteAR2(ar2);
-            Debug.WriteLine(ar2);
+            //Debug.WriteLine(ar2);
             return InstructionResult.Ticks(ReadMemoryCycles+17);
         }
         private InstructionResult HandleFMP(int code)
@@ -1525,7 +1526,7 @@ namespace HP9825CPU
             var m2 = ar2.GetMantissa();
             // page 105
             int carry = DecimalCarry ? 1 : 0;
-            Debug.Write(string.Format("FMP - {0} - {1} - {2} - ", ar1, ar2, carry));
+            //Debug.Write(string.Format("FMP - {0} - {1} - {2} - ", ar1, ar2, carry));
 
             int overflows = 0;
             for(int cnt = 0; cnt<count;cnt++)
@@ -1554,7 +1555,7 @@ namespace HP9825CPU
             ar2.PutMantissa(m2);
             WriteAR2(ar2);
             WriteRegister(CpuRegister.A, overflows);
-            Debug.WriteLine(" {0} - {1} - {2}", ar2, carry, overflows);
+            //Debug.WriteLine(" {0} - {1} - {2}", ar2, carry, overflows);
 
             return InstructionResult.Ticks(count == 0 ? ReadMemoryCycles + 28 : 4 * ReadMemoryCycles + 13 * count + 18);
         }
@@ -1568,7 +1569,7 @@ namespace HP9825CPU
             int count = 0;
             int carry;
             carry = DecimalCarry ? 1 : 0;
-            Debug.Write(string.Format("FDV {0} - {1} - {2} - ", ar1, ar2, carry));
+            //Debug.Write(string.Format("FDV {0} - {1} - {2} - ", ar1, ar2, carry));
             // page 105
             if (ar1.IsZero)
                 Fail("FDV had a divide by zero condition. AR1 is zero.");
@@ -1598,7 +1599,7 @@ namespace HP9825CPU
                 DecimalCarry=false;
                 ar2.PutMantissa(m2);
                 WriteAR2(ar2);
-                Debug.WriteLine("{0}, {1}", ar2, count);
+                //Debug.WriteLine("{0}, {1}", ar2, count);
                 WriteRegister(CpuRegister.B, count);
             }
 
@@ -1794,7 +1795,7 @@ namespace HP9825CPU
             get => ReadRegister(CpuRegister.P);
             set
             {
-                if (value < 0 || (value > (Memory.Use16Bit ? 0xFFFF : 0x07FFF)))
+                if (value < 32 || (value > (Memory.Use16Bit ? 0xFFFF : 0x07FFF)))
                     Fail($"Code ended outside the valid memory range at {value} coming from {PC}...");
                 else
                     WriteRegister(CpuRegister.P, value);
@@ -2014,15 +2015,22 @@ namespace HP9825CPU
                 tickLimit = startedAt + tickLimit.Value;
             while (State == SimulatorState.Running)
             {
-                Tick();
-                // check if "real time" is more than a ms behind simulated time, delay if so...
-                if (realTime)
+                try
                 {
-                    DateTime now = DateTime.UtcNow;
-                    // TODO: wait if we run fast... tell the outside if we run slow...
+                    Tick();
+                    // check if "real time" is more than a ms behind simulated time, delay if so...
+                    if (realTime)
+                    {
+                        DateTime now = DateTime.UtcNow;
+                        // TODO: wait if we run fast... tell the outside if we run slow...
+                    }
+                    if(tickLimit.HasValue && tickLimit.Value < Ticks)
+                        break;
                 }
-                if(tickLimit.HasValue && tickLimit.Value < Ticks)
-                    break;
+                catch(Exception ex)
+                {
+                    Fail(ex.Message);
+                }
             }
             IsFreeRunning = false;
             OnStateChanged();   // report new state changed

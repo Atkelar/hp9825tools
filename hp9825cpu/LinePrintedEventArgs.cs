@@ -1,6 +1,6 @@
 using System;
 
-namespace HP9825Simulator
+namespace HP9825CPU
 {
     public class LinePrintedEventArgs
         : EventArgs

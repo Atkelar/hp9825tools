@@ -1,4 +1,4 @@
-namespace HP9825Simulator
+namespace HP9825CPU
 {
     /// <summary>
     /// The hardware keys of the HP9825. Codes are relevant for some translations!
