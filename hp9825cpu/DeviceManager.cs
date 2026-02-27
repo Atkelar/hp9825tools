@@ -34,6 +34,15 @@ namespace HP9825CPU
             instance.System = this;
         }
 
+        /// <summary>
+        /// Adds the device using its default select code...
+        /// </summary>
+        /// <param name="instance">The instance to add.</param>
+        public void Add(DeviceBase instance)
+        {
+            Add(instance.DefaultSelectCode, instance);
+        }
+
         private Dictionary<int, DeviceBase> _Devices = new Dictionary<int, DeviceBase>();
         private Dictionary<DeviceBase, int> _BackIndex = new Dictionary<DeviceBase, int>();
 
@@ -64,10 +73,18 @@ namespace HP9825CPU
             return 0;   // missing device will cause "pulled up" negative logic to take, resulting in 0 in the CPU...
         }
 
-        internal void Tick()
+        internal (bool DeviceFlag, bool DeviceStatus) Tick(int currentCode)
         {
-            foreach(var d in _Devices.Values)
-                d.TickInternal();
+            (bool DeviceFlag, bool DeviceStatus) x = (false,false);
+            foreach(var d in _Devices)
+            {
+                d.Value.TickInternal();
+                if (d.Key == currentCode)
+                {
+                    x = (d.Value.Flag, d.Value.Status);
+                }
+            }
+            return x;
         }
 
         internal void Reset()

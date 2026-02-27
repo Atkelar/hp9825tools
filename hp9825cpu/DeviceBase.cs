@@ -12,11 +12,17 @@ namespace HP9825CPU
         /// </summary>
         /// <param name="deviceTypeName">The device type name, usually fixed for a specific implementation. Could be "" or "".</param>
         /// <param name="deviceName">The specific device name. Should be unique for the device type within a simulation.</param>
-        public DeviceBase(string deviceTypeName, string? deviceName)
+        public DeviceBase(int defaultSelectCode, string deviceTypeName, string? deviceName)
         {
             Name = deviceName ?? deviceTypeName;
             Type = deviceTypeName;
+            if(defaultSelectCode < 0 || defaultSelectCode>15)
+                throw new ArgumentOutOfRangeException(nameof(defaultSelectCode), defaultSelectCode, "Select codes can only range from zero to 15!");
+            DefaultSelectCode = defaultSelectCode;
         }
+
+        public int DefaultSelectCode { get; private set; }
+
         /// <summary>
         /// The display name of the device. For logging/saving...
         /// </summary>
@@ -30,6 +36,8 @@ namespace HP9825CPU
         /// The Hosting device manager for the simulation. Any communication with the simulated system runs across this object.
         /// </summary>
         public DeviceManager? System { get; internal set; }
+        public virtual bool Flag { get; protected set; }
+        public virtual bool Status { get; protected set; }
 
         /// <summary>
         /// Resets the simulated device. Will be called whenever the simulated CPU is reset, or when a device requests a reset via the device manager.

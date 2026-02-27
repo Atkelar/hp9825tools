@@ -33,7 +33,7 @@ namespace HP9825CPU
         private bool _HotReset;
 
         public KeyboardDisplayPrinterDevice(bool use32CharDisplay = true)
-            : base("KDP", null)
+            : base(0, "KDP", null)
         {
             _HotReset = false;
             _DisplayLength = use32CharDisplay ? 32 : 16;

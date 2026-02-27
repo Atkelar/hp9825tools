@@ -109,9 +109,13 @@ namespace HP9825Simulator
             {
                 memory.LoadOptionPack(OptionRom.Strings, new BinaryReader(f));
             }
-            using (var f=File.OpenRead("private/ADVPGM_T.BIN")) // plug in strings ROM...
+            using (var f=File.OpenRead("private/ADVPGM_T.BIN")) // plug in advanced programming ROM...
             {
                 memory.LoadOptionPack(OptionRom.AdvancedProgramming, new BinaryReader(f));
+            }
+            using (var f=File.OpenRead("private/GENIO_T.BIN")) // plug in general IO ROM...
+            {
+                memory.LoadOptionPack(OptionRom.GeneralIO, new BinaryReader(f));
             }
             // using (var f=File.OpenRead("private/GENIO_T.BIN")) // plug in general IO ROM...
             // {
@@ -123,6 +127,9 @@ namespace HP9825Simulator
             // TODO: KDP visual...
 
             kdp.PutKeyPress(HP9825Key.PrintAll, false); // request printout!
+
+            var rtc = new RTCDevice();
+            devices.Add(rtc);
             
             //TestHellorld(kdp);
             //TestCalc(kdp);
@@ -132,7 +139,9 @@ namespace HP9825Simulator
             //TestCat(kdp);
             //TestFunctionKeys(kdp);
             //TestStrings(kdp);
-            TestMandelbrot(kdp);
+            // TestMandelbrot(kdp); // needs strings and adv. prog.
+            //TestRTCSetClock(kdp);
+            TestRTCGetClock(kdp);
 
             devices.Add(0, kdp);
 
@@ -182,6 +191,20 @@ namespace HP9825Simulator
             await base.RunNow();
 
             // save state?!
+        }
+
+        private void TestRTCSetClock(KeyboardDisplayPrinterDevice kdp)
+        {
+            kdp.PutKeyPresses("wrt 9,\"S06 18 12 01 00\"", TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Execute);
+        }
+
+        private void TestRTCGetClock(KeyboardDisplayPrinterDevice kdp)
+        {
+            kdp.PutKeyPresses("dim T$[30];wrt 9,\"R\"; red 9,T$; prt T$", TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Execute);
+            kdp.PutKeyPresses("wrt 9,\"R\"; red 9,A,B,C,D,E; prt A,B,C,D,E", TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Execute);
         }
 
         private void TestMandelbrot(KeyboardDisplayPrinterDevice kdp)

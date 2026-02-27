@@ -1777,15 +1777,14 @@ namespace HP9825CPU
         public bool FlagActive {get;set;}
 
         /// <summary>
-        /// True to indicate an active (grounded!) "Halt" input.
-        /// </summary>
-        public bool HaltActive {get;set;}
-
-        /// <summary>
         /// True to indicate an active (grounded!) "Status" input.
         /// </summary>
         public bool StatusActive {get;set;}
 
+        /// <summary>
+        /// True to indicate an active (grounded!) "Halt" input.
+        /// </summary>
+        public bool HaltActive {get;set;}
 
         /// <summary>
         /// Gets/sets the current program counter position. This is the NEXT instruction that will be handled by the <see cref="Tick"/> call.
@@ -1930,7 +1929,10 @@ namespace HP9825CPU
                     }
                 }
             }
-            Devices.Tick();
+            
+            var x = Devices.Tick(ReadRegister(CpuRegister.PA));
+            FlagActive = x.DeviceFlag;
+            StatusActive = x.DeviceStatus;
         }
 
         public void ClearBreakPoint(int address)
