@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace HP9825CPU
@@ -23,15 +24,16 @@ namespace HP9825CPU
         /// <exception cref="ArgumentOutOfRangeException">Select code invalid.</exception>
         public void Add(int selectCode, DeviceBase instance)
         {
+            if (selectCode<0 || selectCode>15)
+                throw new ArgumentOutOfRangeException(nameof(selectCode), selectCode, "Only 0-15 are allowed for device select codes!");
             if(instance.System != null)
                 throw new InvalidOperationException("Cannot hook up a device to more than one system!");
             if (_Devices.TryGetValue(selectCode, out var existing))
                 throw new InvalidOperationException(string.Format("Duplicate select code for device {0}. {1} already in use by {2}!", instance.Name, selectCode, existing.Name));
-            if (selectCode<0 || selectCode>15)
-                throw new ArgumentOutOfRangeException(nameof(selectCode), selectCode, "Only 0-15 are allowed for device codes!");
             _Devices.Add(selectCode, instance);
-            _BackIndex.Add(instance, selectCode);
+            _DeviceIndex.Add(instance, selectCode);
             instance.System = this;
+            instance.SelectCode = selectCode;
         }
 
         /// <summary>
@@ -44,7 +46,7 @@ namespace HP9825CPU
         }
 
         private Dictionary<int, DeviceBase> _Devices = new Dictionary<int, DeviceBase>();
-        private Dictionary<DeviceBase, int> _BackIndex = new Dictionary<DeviceBase, int>();
+        private Dictionary<DeviceBase, int> _DeviceIndex = new Dictionary<DeviceBase, int>();
 
         /// <summary>
         /// The (simulated) time that the hosting CPU has been running. Since the last reset. Can be used to coordinate timing based events.
@@ -143,7 +145,7 @@ namespace HP9825CPU
         /// <param name="which">The device object. Must be part of this system.</param>
         internal void RequestInterrupt(DeviceBase which)
         {
-            if (_BackIndex.TryGetValue(which, out var index))
+            if (_DeviceIndex.TryGetValue(which, out var index))
             {
                 InterruptRequestMask |= (1 << index);
             }
@@ -154,6 +156,15 @@ namespace HP9825CPU
             if (!_Devices.TryGetValue(selectCode, out var x))
                 return null;
             return x;
+        }
+
+        internal void ReportHardwareAccessError(DeviceBase deviceBase, string message)
+        {
+            int selectCode;
+            if (!_DeviceIndex.TryGetValue(deviceBase, out selectCode))
+                selectCode = -1;
+            // TODO: implement in-system debugger error reporting log with breakpoint option.
+            Debug.WriteLine("Device {0} ({1}) at {2} reported issue: {3}", deviceBase.Name, deviceBase.Type, selectCode, message);
         }
     }
 }

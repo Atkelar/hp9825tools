@@ -1,0 +1,1039 @@
+#
+#  font defintion file for "LED Matrix" style fonts.
+#  Syntax rules:
+#
+#   #-lines and blank lines are ignored.
+#   .DIRECTIVE abc - sets/adds directive abc, see below...
+#
+# 
+#   DEF # x  -> starts definition of character code "#" (0-255) and the display 
+#               version "x" (x can be omitted if equal to ASCII char!)
+#               All lines (including empty!) following the DEF one are treated
+#               as part of the char matrix, like so: blanks are "off" pixels,
+#               non-blanks are "on" pixsls. Any columns or lines missing 
+#               will be assumed "off"; no traling spaces/lines needed.
+#               Only a line starting with "DEF" or "." terminates the line block.
+#
+#   Directives:
+#   .FORMAT  ->  specify the width and height of the font's matrix. 
+#                5x7 = 5 columns, 7 lines. Currently, 32 maximum for both!
+#
+#   .NAME -> The font's name - some font formats want a name, this is it.
+#
+#   .COPY -> The copyright message for the font.
+#
+#   .REM -> Remarks to be added. Can occur multiple times, will form a text 
+#           block if needed.
+#
+
+.NAME HP9825 LED font
+.COPY Font File Copyright 2026 by Atkelar, Glyph Design by HP
+.REM Font has been created by copying over the output of the HP9825A
+.REM pixel by pixel into the font definition. There may be errors. Sorry.
+
+.FORMAT 5x7
+
+DEF 0 ◀
+   x
+  xx
+ xxx
+xxxx
+ xxx
+  xx
+   x
+DEF 1 ¿
+  x
+
+  x
+ x
+x   x
+x   x
+ xxx
+DEF 2 χ
+xxxxx
+
+x   x
+ x x
+  x
+ x x
+x   x
+DEF 3 Ň
+xxxxx
+
+x   x
+xx  x
+x x x
+x  xx
+x   x
+DEF 4 α
+
+
+ xx x
+x  x
+x  x
+x  x
+ xx x
+DEF 5 ϑ
+
+ xxx
+x   x
+xxxx
+x   x
+xx  x
+x xx
+DEF 6 Γ
+xxxxx
+x   x
+x
+x
+x
+x
+x
+DEF 7 ň
+xxxxx
+
+x xx
+xx  x
+x   x
+x   x
+x   x
+DEF 8 Δ
+
+  x
+  x
+ x x
+ x x
+x   x
+xxxxx
+DEF 9 σ
+
+
+ xxxx
+x  x
+x  x
+x  x
+ xx
+DEF 10 ↓
+  x
+  x
+  x
+  x
+x x x
+ xxx
+  x
+DEF 11 λ
+
+x
+ x
+  x
+ x x
+x   x
+x   x
+DEF 12 μ
+
+
+ x  x
+ x  x
+ x  x
+ xxx
+x
+DEF 13 ←
+
+  x
+ x
+xxxxx
+ x
+  x
+DEF 14 τ
+
+
+    x
+ xxx
+x x
+  x
+  x
+DEF 15 Φ
+ xxx
+  x
+ xxx
+x x x
+ xxx
+  x
+ xxx
+DEF 16 Θ
+ xxx
+x   x
+x   x
+xxxxx
+x   x
+x   x
+ xxx
+DEF 17 Ω
+ xxx
+x   x
+x   x
+x   x
+x   x
+ x x
+xx xx
+DEF 18 δ
+  xx
+ x
+  x
+ xxx
+x   x
+x   x
+ xxx
+DEF 19 Å
+  x
+
+ xxx
+x   x
+xxxxx
+x   x
+x   x
+DEF 20 å
+  x
+
+ xxx
+x  x
+x  x
+x  x
+ xx x
+DEF 21 Ä
+ x x
+
+ xxx
+x   x
+xxxxx
+x   x
+x   x
+DEF 22 ä
+ x x
+
+ xxx
+x  x
+x  x
+x  x
+ xx x
+DEF 23 Ö
+ x x
+ xxx
+x   x
+x   x
+x   x
+x   x
+ xxx
+DEF 24 ö
+ x x
+
+ xxx
+x   x
+x   x
+x   x
+ xxx
+DEF 25 Ü
+ x x
+x   x 
+x   x
+x   x
+x   x
+x   x
+ xxx
+DEF 26 ü
+ x x
+
+x   x
+x   x
+x   x
+x   x
+ xxx
+DEF 27 Ӕ
+ xxxx
+x x
+x x
+xxxxx
+x x
+x x
+xxxxx
+DEF 28 ӕ
+
+
+ x x
+x x x
+x xxx
+x x
+ x xx
+DEF 29 ²
+ xx
+x  x
+  x
+ x
+xxxx
+DEF 30 £
+  xx
+ x  x
+ x
+xxx
+ x
+ x
+xxxx
+DEF 31 ▒
+x x x
+ x x
+x x x
+ x x
+x x x
+ x x
+x x x
+DEF 32
+DEF 33
+ x
+ x
+ x
+ x
+ x
+
+ x
+DEF 
+ x x
+ x x
+DEF
+ x x
+ x x
+xxxxx
+ x x
+xxxxx
+ x x
+ x x
+DEF
+  x
+ xxxx
+x x
+ xxx
+  x x
+xxxx
+  x
+DEF
+xx
+xx  x
+   x
+  x
+ x
+x  xx
+   xx
+DEF 
+ x
+x x
+x x
+ x
+x x x
+x  x
+ xx x
+DEF
+ xx
+ xx
+  x
+ x
+DEF
+   x
+  x
+  x
+  x
+  x
+  x
+   x
+DEF
+ x 
+  x
+  x
+  x
+  x
+  x
+ x
+DEF
+
+ x x
+  x
+xxxxx
+  x
+ x x
+DEF
+
+  x
+  x
+xxxxx
+  x
+  x
+DEF
+
+
+
+ xx
+ xx
+  x
+ x
+DEF
+
+
+
+xxxxx
+DEF
+
+
+
+
+
+ xx
+ xx
+DEF
+
+
+    x
+   x
+  x
+ x
+x
+DEF
+ xxx
+x   x
+x  xx
+x x x
+xx  x
+x   x
+ xxx
+DEF
+  x
+ xx
+  x
+  x
+  x
+  x
+ xxx
+DEF
+ xxx
+x   x
+    x
+  xx
+ x
+x
+xxxxx
+DEF
+ xxx
+x   x
+    x
+  xx
+    x
+x   x
+ xxx
+DEF
+   x
+  xx
+ x x
+x  x
+xxxxx
+   x
+   x
+DEF
+xxxxx
+x
+xxxx
+    x
+    x
+x   x
+ xxx
+DEF
+  xx
+ x
+x
+xxxx
+x   x
+x   x
+ xxx
+DEF
+xxxxx
+    x
+   x
+  x
+ x
+ x
+ x
+DEF
+ xxx
+x   x
+x   x
+ xxx
+x   x
+x   x
+ xxx
+DEF
+ xxx
+x   x
+x   x
+ xxxx
+    x
+   x
+ xx
+DEF 
+
+ xx
+ xx 
+
+ xx 
+ xx
+DEF
+ xx
+ xx 
+
+ xx 
+ xx
+  x
+ x
+DEF
+   x
+  x
+ x
+x
+ x
+  x
+   x
+DEF
+
+
+xxxxx
+
+xxxxx
+DEF
+x
+ x
+  x
+   x
+  x
+ x
+x
+DEF
+ xxx
+x   x
+x   x
+   x
+  x
+
+  x
+DEF
+ xxx
+x   x
+x xxx
+x x x
+x xxx
+x
+ xxx
+DEF 65
+ xxx
+x   x
+x   x
+xxxxx
+x   x
+x   x
+x   x
+DEF
+xxxx
+x   x
+x   x
+xxxx
+x   x
+x   x
+xxxx
+DEF
+ xxx
+x   x
+x
+x
+x
+x   x
+ xxx
+DEF
+xxxx
+x   x
+x   x
+x   x
+x   x
+x   x
+xxxx
+DEF
+xxxxx
+x
+x
+xxxx
+x
+x
+xxxxx
+DEF
+xxxxx
+x
+x
+xxxx
+x
+x
+x
+DEF
+ xxx
+x   x
+x
+x
+x  xx
+x   x
+ xxxx
+DEF
+x   x
+x   x
+x   x
+xxxxx
+x   x
+x   x
+x   x
+DEF
+ xxx
+  x
+  x
+  x
+  x
+  x
+ xxx
+DEF
+    x
+    x
+    x
+    x
+    x
+x   x
+ xxx
+DEF
+x   x
+x  x
+x x
+xx
+x x
+x  x
+x   x
+DEF
+x
+x
+x
+x
+x
+x
+xxxxx
+DEF
+x   x
+xx xx
+x x x
+x x x
+x   x
+x   x
+x   x
+DEF
+x   x
+x   x
+xx  x
+x x x
+x  xx
+x   x
+x   x
+DEF
+ xxx
+x   x
+x   x
+x   x
+x   x
+x   x
+ xxx
+DEF
+xxxx
+x   x
+x   x
+xxxx
+x   
+x   
+x
+DEF
+ xxx
+x   x
+x   x
+x   x
+x x x
+x  x
+ xx x
+DEF
+xxxx
+x   x
+x   x
+xxxx
+x x   
+x  x  
+x   x
+DEF
+ xxx
+x   x
+x   
+ xxx
+    x
+x   x
+ xxx
+DEF
+xxxxx
+  x
+  x
+  x
+  x
+  x
+  x 
+DEF
+x   x
+x   x
+x   x
+x   x
+x   x
+x   x
+ xxx
+DEF
+x   x
+x   x
+x   x
+ x x
+ x x
+  x
+  x
+DEF
+x   x
+x   x
+x   x
+x x x
+x x x
+xx xx
+x   x
+DEF
+x   x
+x   x
+ x x
+  x
+ x x
+x   x
+x   x
+DEF
+x   x
+x   x
+ x x
+  x
+  x
+  x
+  x
+DEF
+xxxxx
+    x
+   x
+  x
+ x   
+x   
+xxxxx
+DEF
+  xxx
+  x
+  x
+  x
+  x
+  x
+  xxx
+DEF 92 √
+
+ xxxx
+ x
+ x
+ x
+xx
+ x
+DEF
+xxx
+  x
+  x
+  x
+  x
+  x
+xxx
+DEF 94 ↑
+  x
+ xxx
+x x x
+  x
+  x
+  x
+  x
+DEF
+
+
+
+
+
+
+xxxxx
+DEF
+ xx
+ xx
+ x
+  x
+
+DEF 97
+
+
+ xxx
+x  x
+x  x
+x  x
+ xx x
+DEF
+x
+x
+x xx
+xx  x
+x   x
+x   x
+xxxx
+DEF
+
+
+ xxx
+x
+x
+x   x
+ xxx
+DEF
+    x
+    x
+ xx x
+x  xx
+x   x
+x   x
+ xxxx
+DEF
+
+
+ xxx
+x   x
+xxxx
+x
+ xxx
+DEF
+  x
+ x x
+ x
+xxx
+ x
+ x
+ x
+DEF
+
+
+ xxxx
+x   x
+ xxxx
+    x
+  xx
+DEF
+x
+x
+x xx 
+xx  x
+x   x
+x   x
+x   x
+DEF
+  x
+
+ xx
+  x
+  x
+  x
+ xx
+DEF
+   x
+
+  xx
+   x
+   x
+x  x
+ xx
+DEF
+x
+x
+x  x
+x x
+xx
+x x
+x  x
+DEF
+ xx
+  x
+  x
+  x
+  x
+  x
+ xxx
+DEF
+
+
+ x x
+x x x
+x x x
+x   x
+x   x
+DEF
+
+
+x xx
+xx  x
+x   x
+x   x
+x   x
+DEF
+
+
+ xxx
+x   x
+x   x
+x   x
+ xxx
+DEF
+
+
+xxxx
+x   x
+xx  x
+x xx
+x
+DEF
+
+
+ xxx
+x  x
+x xx
+ x x
+   xx
+DEF
+
+
+x xx
+xx 
+x
+x
+x
+DEF
+
+
+ xxx
+x 
+ xxx
+    x
+xxxx
+DEF
+
+ x
+xxx
+ x
+ x
+ x x
+  x
+DEF
+
+
+x   x
+x   x
+x   x
+x  xx
+ xx x
+DEF
+
+
+x   x
+x   x
+x   x
+ x x
+  x
+DEF
+
+
+x   x
+x   x
+x   x
+x x x
+ x x
+DEF
+
+
+x   x
+ x x
+  x
+ x x
+x   x
+DEF
+
+
+x   x
+ x x
+  x
+  x
+ x
+DEF
+
+
+xxxxx
+   x
+  x
+ x
+xxxxx
+DEF 123 π
+
+    x
+ xxx
+xx x
+ x x
+ x x
+ x x
+DEF 124 |
+  x
+  x
+  x
+  x
+  x
+  x
+  x
+DEF 125 →
+
+  x
+   x
+xxxxx
+   x
+  x
+
+DEF 126 Σ
+xxxxx
+ x  x
+  x
+   x
+  x
+ x  x
+xxxxx
+DEF 127 Ͱ
+x
+x
+x
+xxxxx
+x
+x
+x
+DEF 128 █
+xxxxx
+xxxxx
+xxxxx
+xxxxx
+xxxxx
+xxxxx
+xxxxx

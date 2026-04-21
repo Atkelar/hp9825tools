@@ -21,6 +21,7 @@ namespace HP9825CPU
             _Output = target ?? new StringWriter();
             _CrossRefOutput = crossRefTo ?? new StringWriter();
             _Is16Bit = use16Bit;
+            Headline = string.Empty;
         }
 
         private readonly bool _Is16Bit;
@@ -32,6 +33,9 @@ namespace HP9825CPU
 
         int _SubLineCount = 0;  // sub-section line counter.
 
+        /// <summary>
+        /// The currently set headline for the printing.
+        /// </summary>
         public string Headline { get; private set; }
 
         /// <summary>
@@ -42,7 +46,7 @@ namespace HP9825CPU
         {
             if (newHeadline != Headline)
             {
-                Headline = newHeadline;
+                Headline = newHeadline ?? string.Empty;
                 if (Format.PageHeader != PageHeaderFormat.None)
                 {
                     if (Format.NewPageOnHeadlineChange)
@@ -136,6 +140,9 @@ namespace HP9825CPU
             }
         }
 
+        /// <summary>
+        /// Gets or sets the filename to use in header/footer lines.
+        /// </summary>
         public string? Filename { get; set; }
 
         /// <summary>
@@ -163,6 +170,12 @@ namespace HP9825CPU
             return 0;
         }
 
+        /// <summary>
+        /// Returns a properly formatted memory address for the current output format settings.
+        /// </summary>
+        /// <param name="address">The memory address.</param>
+        /// <param name="includeTypeCharacter">True to include the "base" type character (h, b) as a suffix.</param>
+        /// <returns>The formatted and justified address.</returns>
         public string GetFormattedAddress(int address, bool includeTypeCharacter)
         {
             return Format.FormatWord(address, !_Is16Bit, includeTypeCharacter);
@@ -230,6 +243,11 @@ namespace HP9825CPU
             }
         }
 
+        /// <summary>
+        /// Prints a line containing only a numeric value (for use with ASC or similar content) and an empty line comment.
+        /// </summary>
+        /// <param name="address">The address to show, if any.</param>
+        /// <param name="value">The value to print.</param>
         public void PrintSourceSubLine(int? address, int? value)
         {
             _SubLineCount++;

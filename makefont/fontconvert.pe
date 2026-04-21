@@ -1,0 +1,6 @@
+#!/usr/bin/fontforge
+
+Open($1)
+SetFontNames($2, $3, $4, $5, $6)
+Generate($1:r + ".ttf")
+Generate($1:r + ".woff2")

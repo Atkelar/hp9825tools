@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Font test</title>
+        <style>
+            @font-face {
+                font-family: "HP9825A Digital";
+                font-weight: normal;
+                src: url("hp9825.woff2") format(woff2);
+            }
+            @font-face {
+                font-family: "HP9825A Digital";
+                font-weight: bold;
+                src: url("hp9825-bold.woff2") format(woff2);
+            }
+
+            div.display
+            {
+                font-family: "HP9825A Digital", 'Courier New', Courier, monospace;
+                background-color: rgb(60, 0, 0);
+
+                color: red;
+                width: 32em;
+                overflow: hidden;
+                padding: 0.5em;
+                margin: 1em;
+            }
+            div.print
+            {
+                font-family: "HP9825A Digital", 'Courier New', Courier, monospace;
+                background-color: blanchedalmond;
+                padding: 1em;
+                margin: 1em;
+                color: black;
+                width: 16em;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Testing display...</h1>
+        <div class="display">Ͱ</div>
+        <div class="display">prt "Hello <b>A</b>BC!"</div>
+        <div class="display">prt "Hello A◀C!"</div>
+        <h1>Testing printer...</h1>
+        <div class="print">abc prt "Hello ABC!"</div>
+        <h1>Testing charset...</h1>
+        <p>
+            The full defined character set; Note that some characters are off from the original
+            definition, because I couldn't find a unicode equivalend that was in the BMP. I wanted
+            to keep it "unescaped UTF-16" at a minimum.
+        </p>
+        <div class="print">
+◀¿χŇαϑΓňΔσ↓λμ←τΦ<br/>
+ΘΩδÅåÄäÖöÜüӔӕ²£▒<br/>
+&nbsp;!"#$%&amp;'()*+,-./<br/>
+0123456789:;&lt;=&gt;?<br/>
+@ABCDEFGHIJKLMNO<br/>
+PQRSTUVWXYZ[√]↑_<br/>
+`abcdefghijklmno<br/>
+pqrstuvwxyzπ|→ΣͰ<br/>
+        </div>
+    </body>
+</html>

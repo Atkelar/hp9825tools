@@ -22,7 +22,7 @@ namespace HP9825CPU
         /// </summary>
         BreakPointHit = 3,
         /// <summary>
-        /// Whenever the simulator ended up in a state that is not valid; normal CPU would continue to run in circles probably, but the simulator aborts.
+        /// Whenever the simulator ended up in a state that is not valid; the normal CPU would continue to run in circles probably, but the simulator aborts. Unknown opcodes trigger this one.
         /// </summary>
         FailedState = 4,
     }

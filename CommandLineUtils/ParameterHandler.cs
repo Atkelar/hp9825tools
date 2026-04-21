@@ -393,7 +393,14 @@ namespace CommandLineUtils
                         Property.SetValue(Target, value);
                     }
                     else
-                        throw new NotImplementedException();
+                    {
+                        if (Property.PropertyType == typeof(double))
+                        {
+                            Property.SetValue(Target, double.Parse(value));
+                        }
+                        else
+                            throw new NotImplementedException();
+                    }
                 }
             }
         }

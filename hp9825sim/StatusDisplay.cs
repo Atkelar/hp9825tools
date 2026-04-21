@@ -60,6 +60,15 @@ namespace HP9825Simulator
                 prt.Show();
                 AddChild(prt);
             }
+            TapeDrive? tape = _Simulator.Devices.GetAt(1) as TapeDrive;
+            if(tape != null)
+            {
+                var tapeStatus = new TapeStatus(tape);
+
+                tapeStatus.Position = new Location(2, 12);
+                tapeStatus.Show();
+                AddChild(tapeStatus);
+            }
         }
 
         private void CPU_StateChanged(object? sender, EventArgs e)

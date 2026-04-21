@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text.Encodings.Web;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.VisualBasic;
@@ -86,7 +89,7 @@ namespace HP9825CPU
                 registers[registerIndex] = value;
         }
 
-        private int ReadRegister(CpuRegister register)
+        internal int ReadRegister(CpuRegister register)
         {
             // TODO: edge cases for floating point number handling: this (register array!) should be moved to the memory manager instead!
             int registerIndex = (int)register;
@@ -1874,6 +1877,11 @@ namespace HP9825CPU
                 }
                 else
                 {
+                    if (_Tracepoints != null && _Tracepoints.TryGetValue(PC, out var tpl))
+                    {
+                        foreach(var t in tpl)
+                            t.Triggerred(this);
+                    }
                     ResetTiming();
                     result = thisHandler(opCode);
                 }
@@ -1952,6 +1960,7 @@ namespace HP9825CPU
         }
 
         private Dictionary<int, BreakpointDefinition> _Breakpoints = new Dictionary<int, BreakpointDefinition>();
+        private Dictionary<int, List<CpuTracepointSpec>> _Tracepoints;
 
         private void ChangeState(SimulatorState newState)
         {
@@ -2001,6 +2010,7 @@ namespace HP9825CPU
         }
 
         public bool IsFreeRunning { get; private set; }
+        public bool DebugBinaryCode { get; set; }
 
         public async Task Run(bool realTime = false, long? tickLimit = null)
         {
@@ -2037,6 +2047,170 @@ namespace HP9825CPU
             IsFreeRunning = false;
             OnStateChanged();   // report new state changed
         }
+
+
+        /// <summary>
+        /// Adds a debugging tracepoint. When the code executes the instruction at <paramref name="address"/>, the message is formatted and printed. Note: printed before the instruction is executed!
+        /// </summary>
+        /// <param name="address">The address to monitor (in PC)</param>
+        /// <param name="messageTemplate">The message to print. Can include [] placehodlers for registers or memory locations.</param>
+        public void SetTracepoint(int address, string messageTemplate, string? name = null, string? label = null, TraceCategory category = TraceCategory.Normal)
+        {
+            // TODO provide list/clear/reset feature...
+            _Tracepoints ??= new Dictionary<int, List<CpuTracepointSpec>>();
+            name ??= $"TP{_Tracepoints.Count+1}";
+            label ??= name;
+            List<CpuTracepointSpec> x;
+            if (!_Tracepoints.TryGetValue(address, out x))
+                _Tracepoints.Add(address, x = new List<CpuTracepointSpec>());
+            x.Add(new CpuTracepointSpec(address, name, label, messageTemplate, category) { IsEnabled = true });
+        }
+
+        private TraceCategory _EnableLoggingForCategory = TraceCategory.All;
+
+        internal void LogDebugMessage(TraceCategory category, string message, params object?[] args)
+        {
+            LogDebugMessage(category, string.Format(message, args));
+        }
+
+        private class DiagLogEntry
+        {
+            public TimeSpan? UpTime { get; internal set; }
+            public TraceCategory Category { get; internal set; }
+            public string Message { get; internal set; }
+            public int ProgramCounter { get; internal set; }
+        }
+
+        private List<DiagLogEntry> _DiagnosticLog = new List<DiagLogEntry>();
+
+        internal void LogDebugMessage(TraceCategory category, string message)
+        {
+            if ((category & _EnableLoggingForCategory) != 0)
+            {
+                lock(this)
+                    _DiagnosticLog.Add(new DiagLogEntry() 
+                    {
+                        UpTime = UpTime,
+                        Category = category,
+                        Message = message,
+                        ProgramCounter = PC
+                    });
+                if (DebugBinaryCode)
+                {
+                    // TODO: write log file?
+                    if(UpTime.HasValue)
+                        Debug.WriteLine("{0:000,000.000,13} @{3,5} - {1}: {2}", UpTime.Value.TotalMilliseconds, category, message, Convert.ToString(PC, 8));
+                    else
+                        Debug.WriteLine("              @{2,5} - {0}: {1}", category, message, Convert.ToString(PC, 8));
+                }
+                else
+                {
+                    // TODO: write log file?
+                    if(UpTime.HasValue)
+                        Debug.WriteLine("{0:000,000.000} - {1}: {2}", UpTime.Value.TotalMilliseconds, category, message);
+                    else
+                        Debug.WriteLine("                 {0}: {1}", category, message);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Exports the current content of the diagnostic log buffer to the provided file name.
+        /// </summary>
+        /// <param name="path">The export file name.</param>
+        /// <param name="format">The requested diagnostic format.</param>
+        /// <param name="clearLog">True to clear the log after save (transactional) or falst to keep the entries.</param>
+        public async Task SaveDiagnosticLog(string path, LogExportFormat format, bool clearLog = false)
+        {
+            var saveThis = _DiagnosticLog;
+            DiagLogEntry? audit = null;
+            try
+            {
+                if (clearLog)
+                {
+                    string logSavedTo = $"Log cleared and saved to {path}";
+                    audit = new DiagLogEntry() {
+                            Category = TraceCategory.Normal, Message = logSavedTo, ProgramCounter = PC, UpTime = UpTime
+                        };
+                    lock(this)
+                    {
+                        _DiagnosticLog = new List<DiagLogEntry>();
+                        _DiagnosticLog.Add(audit);
+                    }
+                    saveThis.Add(audit);
+                }
+                switch (format)
+                {
+                    case LogExportFormat.Text:
+                        await SaveDiagnosticLogText(path, saveThis);
+                        break;
+                    case LogExportFormat.Html:
+                        await SaveDiagnosticLogHtml(path, saveThis);
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+            }
+            catch (Exception ex)
+            {
+                if (audit != null && clearLog)
+                {
+                    // cleanup needed! Revert and add error message!
+                    lock(this)
+                    {
+                        saveThis.Add(new DiagLogEntry() { Category= TraceCategory.Error,  Message = "Failed to save log: " + ex.Message, ProgramCounter = PC, UpTime = UpTime});
+                        _DiagnosticLog.RemoveAt(0);
+                        saveThis.AddRange(_DiagnosticLog);
+                        _DiagnosticLog = saveThis;
+                    }
+                }
+                throw;
+            }
+        }
+
+        private async Task SaveDiagnosticLogHtml(string path, List<DiagLogEntry> saveThis)
+        {
+            using(var f = System.IO.File.CreateText(path))
+            {
+                await SaveDiagnosticLogHtml(f, saveThis);
+            }
+        }
+
+        private async Task SaveDiagnosticLogHtml(TextWriter f, List<DiagLogEntry> saveThis)
+        {
+            await f.WriteLineAsync(@"<!DOCTYPE html>
+<html lang=""en"">
+    <head>
+        <title>Diagnostic log</title>
+        <style>
+        </style>
+    </head>
+    <body>");
+
+            await f.WriteLineAsync(string.Format("<h1>Log created {0:yyyy-MM-dd HH:mm:ss}</h2>", DateTime.Now));
+            int count = 0;
+            await f.WriteLineAsync("<table><tr><th>#</th><th>when [µs]</th><th>where</th><th>?</th><th>Message</th></tr>");
+            foreach(var item in saveThis)
+            {
+                count++;
+                await f.WriteLineAsync(string.Format("<tr><td>{0}</td><td>{1:0.00}</td><td>{4}</td><td>{2}</td><td>{3}</td></tr>", count, item.UpTime?.TotalMicroseconds, item.Category, HtmlEncoder.Default.Encode(item.Message), Convert.ToString(item.ProgramCounter, 8)));
+            }
+            await f.WriteLineAsync("</table>");
+
+            await f.WriteLineAsync(@"    </body>
+</html>");
+        }
+
+        private async Task SaveDiagnosticLogText(string path, List<DiagLogEntry> saveThis)
+        {
+            throw new NotImplementedException();
+        }
         #endregion
+    }
+
+    public enum LogExportFormat
+    {
+        Text,
+        Html
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace HP9825CPU
@@ -101,6 +102,26 @@ namespace HP9825CPU
             && Digit(5) < 10 && Digit(6) < 10 && Digit(7) < 10 && Digit(8) < 10
             && Digit(9) < 10 && Digit(10) < 10 && Digit(11) < 10 && Digit(12) < 10;
 
+        /// <summary>
+        /// Compars the floating point number to another one.
+        /// </summary>
+        /// <param name="obj">The target.</param>
+        /// <returns>True if the object is a floating point number of equal value.</returns>
+        public override bool Equals([NotNullWhen(true)] object? obj)
+        {
+            if (obj == null ||  !(obj is FloatingPointNumber x))
+                return false;
+            return x == this;
+        }
+
+        /// <summary>
+        /// Gets a hash code for this number.
+        /// </summary>
+        /// <returns>A hashcode.</returns>
+        public override int GetHashCode()
+        {
+            return M ^ M1 ^ M2 ^ M3;
+        }
 
         /// <summary>
         /// Equality comparison.
