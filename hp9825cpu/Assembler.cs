@@ -178,7 +178,7 @@ namespace HP9825CPU
                                 throw from.Error(AssemblerErrorCodes.InvalidSuffix, "Invalid DEF encountered! Expecting ,I at most, found ,{line}");
                             }
                         }
-                        result = AssemblyLine.FromDef(from, baseAddress, exp, exp.ToString(), isIndirect, label, line);
+                        result = AssemblyLine.FromDef(from, baseAddress.Value, exp, exp.ToString(), isIndirect, label, line);
                         break;
                     case "BSS":
                         if (!baseAddress.HasValue)

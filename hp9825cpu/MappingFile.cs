@@ -563,7 +563,7 @@ namespace HP9825CPU
         }
 
         private string? _StarLine;
-        private string StarLine => _StarLine != null && _StarLine.Length == StarLineCounter ? _StarLine : new string('*', StarLineCounter);
+        private string StarLine => _StarLine != null && _StarLine.Length == StarLineCounter ? _StarLine : _StarLine = new string('*', StarLineCounter);
 
         private bool ProcessMemory(Memory memory, ListingPrinter? printer, bool creaetMissingLabels)
         {
@@ -687,7 +687,7 @@ namespace HP9825CPU
                                                 if (def.RelativeAddress.HasValue)
                                                     labelFor = RelativeAddress(labelFor, def.RelativeAddress.Value);
                                                 // TODO: value to output...
-                                                line = AssemblyLine.FromDef(SourceLineRef.Unknown, address, null, labelFor, indirect, label, comment);
+                                                line = AssemblyLine.FromDef(SourceLineRef.Unknown, address, null, labelFor ?? "?", indirect, label, comment);
                                             }
                                             address++;
                                             break;
@@ -741,7 +741,6 @@ namespace HP9825CPU
                                 default:
                                     //address++;
                                     throw new NotImplementedException();
-                                    break;
                             }
                             if (printer != null) line?.CreateOutput(printer);
                             if (printer != null && def.Label != null && def.Aliases != null && def.Aliases.Length > 0)

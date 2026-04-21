@@ -108,12 +108,12 @@ namespace HP9825CPU
             return new AssemblyEndLine(from, comment);
         }
 
-        internal static AssemblyLine FromDef(SourceLineRef from, int? address, Assembler.ExpressionBase? fixupFrom, string expression, bool isIndirect, string? label, string? comment)
+        internal static AssemblyLine FromDef(SourceLineRef from, int address, Assembler.ExpressionBase? fixupFrom, string expression, bool isIndirect, string? label, string? comment)
         {
             return new AssemblyDefLine(from, address, fixupFrom, expression, isIndirect, label, comment);
         }
 
-        internal static AssemblyLine FromAbs(SourceLineRef from, int? address, Assembler.ExpressionBase? fixupFrom, string expression, string? label, string? comment)
+        internal static AssemblyLine FromAbs(SourceLineRef from, int address, Assembler.ExpressionBase? fixupFrom, string expression, string? label, string? comment)
         {
             return new AssemblyAbsLine(from, address, fixupFrom, expression, label, comment);
         }
@@ -326,8 +326,9 @@ namespace HP9825CPU
                     manager?.SetKnownLocation(label, Value.Value);
                 else
                 {
-                    Manager = manager;
+                    _Manager = manager;
                     manager?.RegisterRelocationDependency(FixupNow);
+                    this._FixupFrom = fixupFrom;
                 }
                 Expression = expression;
                 IsRepeatable = true;    // this will make sure that EQU following REP will throw up!
@@ -346,19 +347,21 @@ namespace HP9825CPU
             {
                 if (Value.HasValue)
                     return;
-                var x = FixupFrom?.Compute();
+                var x = _FixupFrom?.Compute();
                 if (x.HasValue)
                 {
                     Value = x.Value;
-                    Manager?.SetKnownLocation(Label, x.Value);
+                    // EQU line MUST have a label, as per constructor!
+                    _Manager?.SetKnownLocation(Label!, x.Value); 
+                    this._FixupFrom = null;
                 }
             }
 
             int? Value;
             string Expression;
 
-            Assembler.ExpressionBase? FixupFrom;
-            LabelManager? Manager;
+            private Assembler.ExpressionBase? _FixupFrom;
+            private LabelManager? _Manager;
 
             public override void CreateOutput(ListingPrinter target)
             {
@@ -452,7 +455,7 @@ namespace HP9825CPU
         private class AssemblyDefLine
                 : AssemblyLine
         {
-            public AssemblyDefLine(SourceLineRef from, int? address, Assembler.ExpressionBase? fixupFrom, string expression, bool isIndirect, string? label, string? comment)
+            public AssemblyDefLine(SourceLineRef from, int address, Assembler.ExpressionBase? fixupFrom, string expression, bool isIndirect, string? label, string? comment)
                 : base(from, address, comment, label)
             {
                 Value = fixupFrom?.Compute();   // try here...
@@ -473,7 +476,8 @@ namespace HP9825CPU
             }
             public override void ApplyTo(Memory target)
             {
-                if (target.Contains(Address.Value))
+                // Address will always have a value, as per constructor.
+                if (target.Contains(Address!.Value))
                 {
                     int value = Value ?? FixupFrom?.Compute() ?? throw new InvalidOperationException($"Expression for DEF didn't compute: {Expression}");
                     target[Address.Value] = value;
@@ -493,7 +497,7 @@ namespace HP9825CPU
         private class AssemblyAbsLine
                 : AssemblyLine
         {
-            public AssemblyAbsLine(SourceLineRef from, int? address, Assembler.ExpressionBase? fixupFrom, string expression, string? label, string? comment)
+            public AssemblyAbsLine(SourceLineRef from, int address, Assembler.ExpressionBase? fixupFrom, string expression, string? label, string? comment)
                 : base(from, address, comment, label)
             {
                 Value = fixupFrom?.Compute();   // try here...
@@ -513,7 +517,8 @@ namespace HP9825CPU
            
             public override void ApplyTo(Memory target)
             {
-                if (target.Contains(Address.Value))
+                // Address always has a value, as per constructor!
+                if (target.Contains(Address!.Value))
                 {
                     int value = Value ?? FixupFrom?.Compute() ?? throw new InvalidOperationException($"Expression for ABS didn't compute: {Expression}");
                     target[Address.Value] = value;
@@ -665,7 +670,8 @@ namespace HP9825CPU
 
             public override void ApplyTo(Memory target)
             {
-                if (target.Contains(Address.Value))
+                // Address will always have a value, as per constructor.
+                if (target.Contains(Address!.Value))
                 {
                     if (FixupFrom != null)
                     {

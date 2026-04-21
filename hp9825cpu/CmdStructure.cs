@@ -33,7 +33,7 @@ namespace HP9825CPU
         public class Variant
         {
             public int OpCode { get; internal set; }
-            public string Mnemonic { get; internal set; }
+            public required string Mnemonic { get; internal set; }
         }
 
         public IEnumerable<Variant> GetVersions()
