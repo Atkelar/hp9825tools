@@ -14,7 +14,7 @@ namespace CommandLineUtils
     /// <summary>
     /// Provides an abstract base class for handling advanced console style output.
     /// </summary>
-    public abstract class OutputHandlerBase
+    public abstract partial class OutputHandlerBase
         : IDisposable
     {
         /// <summary>
@@ -54,7 +54,7 @@ namespace CommandLineUtils
         /// </summary>
         /// <param name="level">The level to check.</param>
         /// <returns>True to provide output, false to null-out.</returns>
-        public bool IsReuested(VerbosityLevel level)
+        public bool IsRequested(VerbosityLevel level)
         {
             return Verbosity >= level && level >= VerbosityLevel.Errors;
         }
@@ -66,7 +66,7 @@ namespace CommandLineUtils
             {
                 // verbosity is from 0 for quiet to n...
                 var tl = (VerbosityLevel)i;
-                if (IsReuested(tl))
+                if (IsRequested(tl))
                     Targets[i] = CreateFor(tl);
                 else   
                     Targets[i] = null;
@@ -98,7 +98,7 @@ namespace CommandLineUtils
         /// <param name="level">The level to target;</param>
         /// <param name="numChars">The number of characters to be indented. Maxes out at half the available width!</param>
         /// <returns>A tracker object. Use in a "using" block to undo-indent.</returns>
-        public IDisposable Indent(VerbosityLevel level, int numChars)
+        public IDisposable Indent(VerbosityLevel level, int? numChars = null)
         {
             var t = TargetFor(level);
             if (t==null)
@@ -111,10 +111,11 @@ namespace CommandLineUtils
             {
                 numChars = max - t.IndentLevel;
             }
+            numChars ??= 4;
             if (numChars < 0)
                 numChars=0;
-            t.IndentLevel+=numChars;
-            return new Indenter(this, level, numChars);
+            t.IndentLevel += numChars.Value;
+            return new Indenter(this, level, numChars.Value);
         }
 
         private class DummyIndent
@@ -154,7 +155,7 @@ namespace CommandLineUtils
         /// Make sure we are now at the beginning of a new line, add line break if not.
         /// </summary>
         /// <param name="level">The verbosity level to aim for.</param>
-        /// <param name="forceEmptyLine">True to force an empty line, false to stay in the current line if we are already on the beginning</param>
+        /// <param name="forceEmptyLine">True to force an empty line, false to stay in the current line if we are already on the beginning of a line.</param>
         public void EnsureNewLine(VerbosityLevel level, bool forceEmptyLine = false)
         {
             if (!_LineBuffers.TryGetValue(level, out var line))
@@ -178,9 +179,10 @@ namespace CommandLineUtils
         /// <param name="header">The label text for the output; will be put into the first(current) line for the indented part.</param>
         /// <param name="numChars">The minimum number of characters to be indented. Maxes out at half the available width!</param>
         /// <returns>A tracker object. Use in a "using" block to undo-indent.</returns>
-        public IDisposable IndentFor(VerbosityLevel level, string header, int numChars = 0)
+        public IDisposable IndentFor(VerbosityLevel level, string header, int? numChars = null)
         {
-            var n = Math.Max(header.Length, numChars);
+            numChars ??= 4;
+            var n = Math.Max(header.Length, numChars.Value);
             EnsureNewLine(level);
             Write(level, SplitMode.Any, header);
             return Indent(level, n);
@@ -192,7 +194,7 @@ namespace CommandLineUtils
         /// <param name="level">The level to go for in the output.</param>
         /// <param name="creator">Callback to create the table; will only get called if the level is actually requested.</param>
         /// <returns>A table formatter to use to create tabular output!</returns>
-        public TableFormatter Table(VerbosityLevel level, Action<ITableBuilder> creator)
+        public ITableFormatter Table(VerbosityLevel level, Action<ITableBuilder> creator)
         {
             var spec = TargetFor(level);
             if(spec == null)
@@ -354,9 +356,9 @@ namespace CommandLineUtils
             private TableColumn col = new TableColumn()
             {
                 Align = HorizontalAlignment.Left,
-                Trimming = TextTrimming.Beginning
+                Trimming = TextTrimming.End
             };
-            public ITableColumnBuilder Align(HorizontalAlignment align, TextTrimming trim = TextTrimming.Beginning)
+            public ITableColumnBuilder Align(HorizontalAlignment align, TextTrimming trim = TextTrimming.End)
             {
                 col.Align = align;
                 col.Trimming = trim;
@@ -388,76 +390,6 @@ namespace CommandLineUtils
             }
         }
 
-        /// <summary>
-        /// Creates a new table definitin.
-        /// </summary>
-        public interface ITableBuilder
-        {
-            /// <summary>
-            /// Adds a column to a table.
-            /// </summary>
-            /// <param name="width">The width in characters.</param>
-            /// <param name="build">The column defnition.</param>
-            /// <returns>The builder for chained calls.</returns>
-            ITableBuilder Column(int width, Action<ITableColumnBuilder> build);
-            /// <summary>
-            /// Adds a column to a table.
-            /// </summary>
-            /// <param name="min">Minimum width in chacacters.</param>
-            /// <param name="max">Maximum width in characters.</param>
-            /// <param name="build">The column defnition.</param>
-            /// <returns>The builder for chained calls.</returns>
-            ITableBuilder Column(int min, int max, Action<ITableColumnBuilder> build);
-            /// <summary>
-            /// Enable header or footer separator for the table.
-            /// </summary>
-            /// <param name="headerSeparator">True to print a dashed line between the headline and the body.</param>
-            /// <param name="footerSeparator">True to print a dashed line between the body and footer of the table.</param>
-            /// <param name="useTicks">True to add + marks between columns.</param>
-            /// <returns>The builder for chained calls.</returns>
-            ITableBuilder Separators(bool headerSeparator, bool footerSeparator, bool useTicks = false);
-
-            /// <summary>
-            /// Sets a template string (with placeholder {0}) for a "summary row" to show number of rows in a line after the table.
-            /// </summary>
-            /// <param name="template">The template string.</param>
-            /// <returns>The builder for chained calls.</returns>
-            ITableBuilder RowCountTemplate(string template);
-
-        }
-
-        /// <summary>
-        /// Creates a single table column.
-        /// </summary>
-        public interface ITableColumnBuilder
-        {
-            /// <summary>
-            /// Sets the alignment and trimming mode for the column. Default would be left aligned, end trimming.
-            /// </summary>
-            /// <param name="align">The alignment.</param>
-            /// <param name="trim">The trimming mode.</param>
-            /// <returns>The builder for chaining calls.</returns>
-            ITableColumnBuilder Align(HorizontalAlignment align, TextTrimming trim = TextTrimming.Beginning);
-            /// <summary>
-            /// Sets an optional header string.
-            /// </summary>
-            /// <param name="header">The header text.</param>
-            /// <returns>The builder for chaining calls.</returns>
-            ITableColumnBuilder Head(string header);
-            /// <summary>
-            /// Sets a format string for formatting <see cref="IFormattable"/>  based objects in the column.
-            /// </summary>
-            /// <param name="formatString">The format string.</param>
-            /// <returns>The builder for chaining calls.</returns>
-            ITableColumnBuilder Format(string formatString);
-            /// <summary>
-            /// Sets a callback to fetch a footer value for the column.
-            /// </summary>
-            /// <param name="source">A function that will be called when the table is done. Any value returned here will be added as a footer line.</param>
-            /// <returns>The builder for chaining calls.</returns>
-            ITableColumnBuilder FooterFrom(Func<object?> source);
-        }
-
         internal class TableColumn
         {
             public string? FormatString { get; set; }
@@ -475,7 +407,7 @@ namespace CommandLineUtils
         /// A table formatting helper.
         /// </summary>
         public class TableFormatter
-            : IDisposable
+            : ITableFormatter
         {
             internal TableFormatter(OutputHandlerBase? parent, VerbosityLevel level, TableColumn[] columns, bool useTicks, bool headSep, bool footSep)
             {
@@ -569,6 +501,7 @@ namespace CommandLineUtils
                 {
                     if(sb.Length>0)
                         sb.Append(lastWasTruncated ? '…' : ' ');
+                    lastWasTruncated = false;   // reset for next column...
                     string vText;
                     if (i< columns.Length && columns[i] != null)
                     {
@@ -795,6 +728,13 @@ namespace CommandLineUtils
                 Dispose(true);
             }
             IsDisposed = true;
+        }
+
+        /// <summary>
+        /// Will be called after hooking up an implementation to an actual command object.
+        /// </summary>
+        protected internal virtual void PostInit()
+        {
         }
     }
 }

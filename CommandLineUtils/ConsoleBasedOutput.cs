@@ -21,6 +21,12 @@ namespace CommandLineUtils
             Console.ForegroundColor = _OriginalColor;
         }
 
+        protected internal override void PostInit()
+        {
+            base.PostInit();
+            _OriginalColor = Console.ForegroundColor;
+        }
+
         private class FileBasedSpec
             : DisplaySpec
         {

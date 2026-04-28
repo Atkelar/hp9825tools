@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace CommandLineUtils
 {
@@ -120,7 +123,14 @@ namespace CommandLineUtils
             {
                 foreach(var fn in _OptionalDefaults)
                 {
-                    await LoadFrom(fn);
+                    try
+                    {
+                        await LoadFrom(fn);
+                    }
+                    catch (ArgumentParsingException ex)
+                    {
+                        throw ReturnCode.ParseError.Happened(ex.ParameterName, string.Format("{0} (in defaults file {1})", ex.Message, fn));
+                    }
                 }
             }
 
@@ -134,66 +144,44 @@ namespace CommandLineUtils
                 if (args[i].StartsWith('@'))
                 {
                     var fn = args[i].Substring(1);
-                    var b = await LoadFrom(fn);
-                    if (!b)
-                        throw ReturnCode.SettingsFileNotFound.Happened(args[i]);
+                    try
+                    {
+                        var b = await LoadFrom(fn);
+                        if (!b)
+                            throw ReturnCode.SettingsFileNotFound.Happened(args[i]);
+                    }
+                    catch (ArgumentParsingException ex)
+                    {
+                        throw ReturnCode.ParseError.Happened(ex.ParameterName, string.Format("{0} (in settings file {1})", ex.Message, fn));
+                    }
                     Console.WriteLine("Loaded settings from {0}...", fn);
                 }
                 else
                 {
-                    if (args[i].StartsWith("--"))
+                    try
                     {
-                        // long name or help
-                        name = args[i].Substring(2);
-                        if (IgnoreCase)
-                            name = name.ToLowerInvariant();
-                        if (name == "help")
+                        if (args[i].StartsWith("--"))
                         {
-                            if (i+1 <args.Length)
-                            {
-                                i++;
-                                HelpRequested = args[i];
-                            }
-                            else
-                                HelpRequested = string.Empty;
-                        }
-                        else
-                        {
-                            if (!LongNames.TryGetValue(name, out var pp))
-                                throw ReturnCode.ParseError.Happened(args[i], "Paramaeter name not found!");
-                            if (pp.HasBeenSet)
-                                throw ReturnCode.ParseError.Happened(args[i], "Parameter defined multiple times!");
-                            if (pp.HasValue)
-                            {
-                                i++;
-                                if (i >= args.Length)
-                                    throw ReturnCode.ParseError.Happened(args[i-1], "Parameter is missing the value!");
-                                pp.SetValue(args[i]);
-                            }
-                            else
-                            {
-                                pp.SetNoValue();
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if (args[i].StartsWith('-'))
-                        {
-                            // short name...
-                            name = args[i].Substring(1);
+                            // long name or help
+                            name = args[i].Substring(2);
                             if (IgnoreCase)
                                 name = name.ToLowerInvariant();
-                            if (name == "?")
+                            if (name == "help")
                             {
-                                HelpRequested = string.Empty;
+                                if (i+1 <args.Length)
+                                {
+                                    i++;
+                                    HelpRequested = args[i];
+                                }
+                                else
+                                    HelpRequested = string.Empty;
                             }
                             else
                             {
-                                if (!ShortNames.TryGetValue(name, out var pp))
-                                    throw ReturnCode.ParseError.Happened(args[i], "Parameter was not found!");
+                                if (!LongNames.TryGetValue(name, out var pp))
+                                    throw ReturnCode.ParseError.Happened(args[i], "Paramaeter name not found!");
                                 if (pp.HasBeenSet)
-                                    throw ReturnCode.ParseError.Happened(args[i], "Parameter was defined multiple times!");
+                                    throw ReturnCode.ParseError.Happened(args[i], "Parameter defined multiple times!");
                                 if (pp.HasValue)
                                 {
                                     i++;
@@ -209,12 +197,48 @@ namespace CommandLineUtils
                         }
                         else
                         {
-                            // positional...
-                            var p = Positional.FirstOrDefault(x => !x.HasBeenSet);
-                            if (p == null)
-                                throw ReturnCode.ParseError.Happened(args[i], "Parameter has no matching positional placeholder!");
-                            p.SetValue(args[i]);
+                            if (args[i].StartsWith('-'))
+                            {
+                                // short name...
+                                name = args[i].Substring(1);
+                                if (IgnoreCase)
+                                    name = name.ToLowerInvariant();
+                                if (name == "?")
+                                {
+                                    HelpRequested = string.Empty;
+                                }
+                                else
+                                {
+                                    if (!ShortNames.TryGetValue(name, out var pp))
+                                        throw ReturnCode.ParseError.Happened(args[i], "Parameter was not found!");
+                                    if (pp.HasBeenSet)
+                                        throw ReturnCode.ParseError.Happened(args[i], "Parameter was defined multiple times!");
+                                    if (pp.HasValue)
+                                    {
+                                        i++;
+                                        if (i >= args.Length)
+                                            throw ReturnCode.ParseError.Happened(args[i-1], "Parameter is missing the value!");
+                                        pp.SetValue(args[i]);
+                                    }
+                                    else
+                                    {
+                                        pp.SetNoValue();
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // positional...
+                                var p = Positional.FirstOrDefault(x => !x.HasBeenSet);
+                                if (p == null)
+                                    throw ReturnCode.ParseError.Happened(args[i], "Parameter has no matching positional placeholder!");
+                                p.SetValue(args[i]);
+                            }
                         }
+                    }
+                    catch (ArgumentParsingException ex)
+                    {
+                        throw ReturnCode.ParseError.Happened(ex.ParameterName, ex.Message);
                     }
                 }
                 i++;
@@ -351,6 +375,7 @@ namespace CommandLineUtils
             public bool HasBeenSet { get; set; }
 
             public bool HasValue { get => Property.PropertyType != typeof(bool); }
+            public ValidationAttribute[] Validators { get; set; } = Array.Empty<ValidationAttribute>();
 
             public string GetValueHelpString()
             {
@@ -364,12 +389,19 @@ namespace CommandLineUtils
                 }
                 else
                 {
-                    if (Property.PropertyType == typeof(int))
+                    if (Property.PropertyType == typeof(int) || Property.PropertyType == typeof(long))
                     {
-                        return "This argument accepts a numeric value.";
+                        return "This argument accepts a numeric integer value. It can have suffixes h/o/b added to indicate hex, oct and bin numbers.";
                     }
                     else
-                        return "??";
+                    {
+                        if (Property.PropertyType == typeof(double))
+                        {
+                            return "This argument accepts a numeric floating point value.";
+                        }
+                        else
+                            return "??";
+                    }
                 }
             }
 
@@ -382,26 +414,106 @@ namespace CommandLineUtils
             public void SetValue(string value)
             {
                 HasBeenSet = true;
-                if (Property.PropertyType == typeof(int))
+                object? parsedValue;
+                if (Property.PropertyType == typeof(long))
                 {
-                    Property.SetValue(Target, int.Parse(value));
+                    parsedValue = ParseLong(value);
                 }
                 else
                 {
-                    if (Property.PropertyType == typeof(string))
+                    if (Property.PropertyType == typeof(int))
                     {
-                        Property.SetValue(Target, value);
+                        parsedValue = ParseInt(value);
                     }
                     else
                     {
-                        if (Property.PropertyType == typeof(double))
+                        if (Property.PropertyType == typeof(string))
                         {
-                            Property.SetValue(Target, double.Parse(value));
+                            parsedValue = value;
                         }
                         else
-                            throw new NotImplementedException();
+                        {
+                            if (Property.PropertyType == typeof(double))
+                            {
+                                parsedValue = double.Parse(value);
+                            }
+                            else
+                                throw new NotImplementedException();
+                        }
                     }
                 }
+                foreach(var v in Validators)
+                {
+                    try
+                    {
+                        v.Validate(parsedValue, Definition.LongName);
+                    }
+                    catch(Exception ex)
+                    {
+                        throw ParseException("Validation failed: value {0}: {1}", parsedValue, ex.Message);
+                    }
+                }
+                // if we get here, the parameter value was within spec.
+                Property.SetValue(Target, parsedValue);
+            }
+
+            private long ParseLong(string value)
+            {
+                try
+                {
+                if (value.EndsWith("o", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    // octal!
+                    return Convert.ToInt64(value.Substring(0,value.Length-1), 8);
+                }
+                else
+                    if (value.EndsWith("h", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        // hex...
+                        return Convert.ToInt64(value.Substring(0,value.Length-1), 16);
+                    }
+                    else
+                        if (value.EndsWith("b", StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            // binary
+                            return Convert.ToInt64(value.Substring(0,value.Length-1), 2);
+                        }
+                        else
+                        {
+                            // decimal.
+                            return Convert.ToInt64(value, 10);
+                        }
+                }
+                catch (Exception ex)
+                {
+                    throw ParseException("Couldn't convert the provided value of '{0}' into an integer value: {1}", value, ex.Message);
+                }
+            }
+
+            private Exception ParseException(string message, params object?[] args)
+            {
+                return new ArgumentParsingException(Definition.LongName, string.Format(message, args));
+            }
+
+            private int ParseInt(string value)
+            {
+                long l = ParseLong(value);
+                if (l < (long)int.MinValue || l > (long)int.MaxValue)
+                    throw ParseException("Integer out of range: {0}", l);
+                return (int)l;
+            }
+
+        }
+
+        private class ArgumentParsingException 
+            : Exception
+        {
+            public string ParameterName {get; private set;}
+
+            public ArgumentParsingException(string longName, string message)
+                : base(message)
+            {
+                this.ParameterName = longName;
             }
         }
 
@@ -441,7 +553,9 @@ namespace CommandLineUtils
                     if (attr.ShortName != null)
                         shortName = prefix != null ? prefix + ":" + attr.ShortName : attr.ShortName;
 
-                    var pMap = new ParamReg() { Definition = attr, LongName = longName, ShortName = shortName, Positional = position, Property = p, Target = target, Prefix = prefix ?? string.Empty };
+                    var valAttrs = p.GetCustomAttributes<System.ComponentModel.DataAnnotations.ValidationAttribute>(true);
+
+                    var pMap = new ParamReg() { Definition = attr, LongName = longName, ShortName = shortName, Positional = position, Property = p, Target = target, Prefix = prefix ?? string.Empty, Validators = valAttrs.ToArray() };
                     All.Add(pMap);
                     
                     if (IgnoreCase)

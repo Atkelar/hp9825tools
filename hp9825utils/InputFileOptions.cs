@@ -32,7 +32,7 @@ namespace HP9825Utils
 
         public Memory MakeBuffer()
         {
-            return Memory.MakeMemory(Use16Bit);
+            return Memory.MakeMemory(Use16Bit, allowArbitraryLength: true);
         }
 
         internal void RegisterErrors(ReturnCodeHandler reg)

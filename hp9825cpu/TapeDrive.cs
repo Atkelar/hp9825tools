@@ -351,19 +351,24 @@ namespace HP9825CPU
             if  (len < 100)
                 throw new InvalidOperationException("Cannot have a cartridge with less than 100 inches of tape!");
             // TODO: maybe find a faster way of checking these; at least the locations are now precomputed.
-            //[29.13 o 0.25 o 15.75 o 0.25 o 15.75 o 0.25 o 23.75 o][content][o 23.75 o 0.25 o 0.25 o]
+            //first assumption: [29.13 o 0.25 o 15.75 o 0.25 o 15.75 o 0.25 o 23.75 o][content][o 23.75 o 0.25 o 0.25 o]
+            // NOTE: The schematic depiction of the three end-of-tape markers is wrong; the service manual
+            // on page 17 has a more detailed descriptoin!
+            //  610mm -> 24", 305 -> 12"
+            //[29.13 o 0.25 o 11.75 o 0.25 o 11.75 o 0.25 o 24 o][content][o 24 o 12 o 12 o]
+
             this._TapeHolePositions = new double[11];
             _TapeHolePositions[6] = -1;    // assume "first start of tape" hole at -1"
-            _TapeHolePositions[5] = _TapeHolePositions[6] - 23.75;
+            _TapeHolePositions[5] = _TapeHolePositions[6] - 24;
             _TapeHolePositions[4] = _TapeHolePositions[5] - 0.25;
-            _TapeHolePositions[3] = _TapeHolePositions[4] - 15.75;
+            _TapeHolePositions[3] = _TapeHolePositions[4] - 11.75;
             _TapeHolePositions[2] = _TapeHolePositions[3] - 0.25;
-            _TapeHolePositions[1] = _TapeHolePositions[2] - 15.75;
+            _TapeHolePositions[1] = _TapeHolePositions[2] - 11.75;
             _TapeHolePositions[0] = _TapeHolePositions[1] - 0.25;
             _TapeHolePositions[7] = _TapeHolePositions[6] + len;
-            _TapeHolePositions[8] = _TapeHolePositions[7] + 23.75;
-            _TapeHolePositions[9] = _TapeHolePositions[8] + 0.25;
-            _TapeHolePositions[10] = _TapeHolePositions[9] + 0.25;
+            _TapeHolePositions[8] = _TapeHolePositions[7] + 24;
+            _TapeHolePositions[9] = _TapeHolePositions[8] + 12;
+            _TapeHolePositions[10] = _TapeHolePositions[9] + 12;
         }
 
         internal const double SpeedFastIps = 90;

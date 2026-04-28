@@ -23,7 +23,7 @@ namespace HP9825Utils
 
         public Memory MakeBuffer()
         {
-            return Memory.MakeMemory(true);
+            return Memory.MakeMemory(true, allowArbitraryLength: true);
         }
 
         internal void RegisterErrors(ReturnCodeHandler reg)

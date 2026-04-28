@@ -41,10 +41,10 @@ namespace HP9825Disassembler
             var map = await ReadMappingFile(result.ActualFilename, result.Offset, result.WordCount);
             // todo: output file for listing...
             var printer = new ListingPrinter(Format.PageWidth, Format.PageHeight, Format.Options, InputParameters.Use16Bit);
-            Out.WriteLine(VerbosityLevel.Normal, "Phase 1...");
+            Output.WriteLine(VerbosityLevel.Normal, "Phase 1...");
             if (map.ProcessMemoryPhase1(memory))
             {
-                Out.WriteLine(VerbosityLevel.Normal, "Phase 2...");
+                Output.WriteLine(VerbosityLevel.Normal, "Phase 2...");
                 if (map.ProcessMemoryPhase2(memory, printer))
                 {
                     string OutputFile = string.IsNullOrWhiteSpace(ContextParameters.OutputFile) ? Path.ChangeExtension(InputParameters.Filename, ".listing.txt") : ContextParameters.OutputFile;
@@ -101,7 +101,7 @@ namespace HP9825Disassembler
                 {
                     try
                     {
-                        map =  await MappingFile.ReadFrom(r, x => Out.WriteLine(VerbosityLevel.Warnings, SplitMode.Word, "{0}:{1}", tryFile, x));
+                        map =  await MappingFile.ReadFrom(r, x => Output.WriteLine(VerbosityLevel.Warnings, SplitMode.Word, "{0}:{1}", tryFile, x));
                     }
                     catch(MappingFileFormatError ex)
                     {

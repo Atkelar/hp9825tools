@@ -71,7 +71,7 @@ namespace CommandLineUtils
         {
             if (isDisposing)
             {
-                Output?.Dispose();
+                Output.Dispose();
             }
         }
 
@@ -146,7 +146,7 @@ namespace CommandLineUtils
             x?.Dispose();
         }
 
-        OutputHandlerBase? Output;
+        OutputHandlerBase Output = ProcessBase.NullOutput;
 
         /// <summary>
         /// Sets up the banner message for the program.
@@ -196,7 +196,7 @@ namespace CommandLineUtils
             Output.WriteLine();
             if (_Command?.HelpMessage != null)
             {
-                using(Output.IndentFor( VerbosityLevel.Normal, "Summary: "))
+                using(Output.IndentFor(VerbosityLevel.Normal, "Summary: "))
                 {
                     Output.WriteLine(_Command.HelpMessage);
                     Output.WriteLine();
@@ -210,6 +210,12 @@ namespace CommandLineUtils
 
         private VerbosityLevel RequestedVerbosity = VerbosityLevel.Normal; 
 
+        /// <summary>
+        /// Runs the application; will be based on the command to run; parses command line arguments, prints startup banner and delegates execution to command object.
+        /// </summary>
+        /// <param name="args">The command line parameters.</param>
+        /// <returns>The result code from the hosted command.</returns>
+        /// <exception cref="InvalidOperationException">The command has not yet been set up, using <see cref="SetupFor{T}(string?)"/></exception>
         public async Task<int> Run(string[] args)
         {
             if (_Command == null)
@@ -221,10 +227,10 @@ namespace CommandLineUtils
                 cmd.Prepare(true);
 
                 string? helpPage = await cmd.Parse(args);
-                cmd.SetOutput(EnsureOutput());
+                cmd.ChangeOutput(EnsureOutput());
                 if (BannerMessage != null)
                 {
-                    Output?.WriteLine(VerbosityLevel.Normal, BannerMessage);
+                    Output.WriteLine(VerbosityLevel.Normal, BannerMessage);
                 }
                 if (helpPage != null)
                 {
@@ -236,13 +242,13 @@ namespace CommandLineUtils
             catch (ReturnCodeException ex)
             {
                 EnsureOutput();
-                Output?.WriteLine(ex.IsNonError ? VerbosityLevel.Normal : VerbosityLevel.Errors, ex.Message);
+                Output.WriteLine(ex.IsNonError ? VerbosityLevel.Normal : VerbosityLevel.Errors, ex.Message);
                 return ex.Code;
             }
             catch(Exception ex)
             {
                 EnsureOutput();
-                Output?.WriteLine(ReturnCode.UhandledError.ErrorMessageTemplate, ex.Message);
+                Output.WriteLine(ReturnCode.UhandledError.ErrorMessageTemplate, ex.Message);
                 
 #if DEBUG
                 Console.WriteLine(ex);
@@ -254,7 +260,7 @@ namespace CommandLineUtils
 
         private OutputHandlerBase EnsureOutput()
         {
-            if (Output == null)
+            if (Output == ProcessBase.NullOutput)
             {
                 var x = new ConsoleBasedOutput();
                 x.Prepare(VerbosityLevel.Normal);

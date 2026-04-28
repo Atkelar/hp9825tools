@@ -15,6 +15,7 @@ namespace HP9825Utils
                 host.Register<InvertBitsCommand>();
                 host.Register<CreateImageCommand>();
                 host.Register<MergeIntoCommand>();
+                host.Register<TranslateAddressCommand>();
 
                 return await host.Run(args);
             }

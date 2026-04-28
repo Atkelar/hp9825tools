@@ -149,7 +149,7 @@ namespace makefont
             if (defs.Count == 0)
                 throw Errors.Happened(FontError.NoGlyphs);
 
-            Out!.WriteLine(VerbosityLevel.Normal, SplitMode.None, "Found {0} glyphs, crating font...", defs.Count);
+            Output!.WriteLine(VerbosityLevel.Normal, SplitMode.None, "Found {0} glyphs, crating font...", defs.Count);
 
             if (Options.InvertChars)
             {

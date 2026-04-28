@@ -40,12 +40,22 @@ namespace CommandLineUtils
         /// </summary>
         protected abstract Task RunNow();
 
-
+        /// <summary>
+        /// Initializes the base core properties.
+        /// </summary>
+        protected ProcessBase()
+        {
+            Out  = new ConditionalOutputImpl(this, VerbosityLevel.Normal);
+            Error = new ConditionalOutputImpl(this, VerbosityLevel.Errors);
+            Warning  = new ConditionalOutputImpl(this, VerbosityLevel.Warnings);
+            Verbose  = new ConditionalOutputImpl(this, VerbosityLevel.Verbose);
+            Trace  = new ConditionalOutputImpl(this, VerbosityLevel.Trace);
+        }
 
         public void WriteLine(VerbosityLevel level, SplitMode split, string? message)
         {
-            if (Out != null)
-                Out.WriteLine(level, split, message);
+            if (Output != null)
+                Output.WriteLine(level, split, message);
             else
             {
                 switch (level)
@@ -62,8 +72,8 @@ namespace CommandLineUtils
 
         public void Write(VerbosityLevel level, SplitMode split, string message)
         {
-            if (Out != null)
-                Out.Write(level, split, message);
+            if (Output != null)
+                Output.Write(level, split, message);
             else
             {
                 switch (level)
@@ -78,15 +88,43 @@ namespace CommandLineUtils
             }
         }
 
-        internal void SetOutput(OutputHandlerBase output)
+        internal void ChangeOutput(OutputHandlerBase output)
         {
-            Out = output;
+            var now = Output;
+            Output = output;
+            if (now is IDisposable disp)
+            {   
+                disp.Dispose();
+            }
+            Output.PostInit();
         }
 
-        protected OutputHandlerBase? Out {get;private set;}
+        /// <summary>
+        /// Access the output object for the running process.
+        /// </summary>
+        protected OutputHandlerBase Output {get;private set;} = NullOutput;
+
+        /// <summary>
+        /// Simplification wrapper for the "normal" output.
+        /// </summary>
+        protected IConditionalOutput Out {get;private set;}
+        /// <summary>
+        /// Simplification wrapper for the "error" output.
+        /// </summary>
+        protected IConditionalOutput Error {get;private set;} 
+        /// <summary>
+        /// Simplification wrapper for the "warning" output.
+        /// </summary>
+        protected IConditionalOutput Warning {get;private set;}
+        /// <summary>
+        /// Simplification wrapper for the "verbose" output.
+        /// </summary>
+        protected IConditionalOutput Verbose {get;private set;}
+        /// <summary>
+        /// Simplification wrapper for the "trace" output.
+        /// </summary>
+        protected IConditionalOutput Trace {get;private set;}
        
-
-
         /// <summary>
         /// Runs the command line parsing and backing command, according to the specs.
         /// </summary>
@@ -146,7 +184,7 @@ namespace CommandLineUtils
         /// <returns>The formatted string, or null if there are no parameters defined.</returns>
         public void WriteHelpText(OutputHandlerBase? output)
         {
-            output ??= Out;
+            output ??= Output;
             if (_Parameters != null && output != null)
             {
                 _Parameters.HelpRequested = string.Empty;
@@ -200,6 +238,62 @@ namespace CommandLineUtils
                 Dispose();
             }
             IsDisposed = true;
+        }
+
+        /// <summary>
+        /// Represents a "silent" (redirect to null) output device. The default <see cref="Output"/> property in the implementation!
+        /// </summary>
+        public static readonly OutputHandlerBase NullOutput = new NullOutputHandler();
+
+        internal class NullOutputHandler
+            : OutputHandlerBase
+        {
+            protected override DisplaySpec CreateFor(VerbosityLevel level)
+            {
+                return new NullDisplaySpec();
+            }
+
+            private class NullDisplaySpec
+                : DisplaySpec
+            {
+                public override int? DisplayWidth => null;
+
+                public override void WriteLine(string ouptut)
+                {}
+            }
+        }
+
+        private class ConditionalOutputImpl
+            : IConditionalOutput
+        {
+            private readonly ProcessBase _Parent;
+            private readonly VerbosityLevel _Level;
+
+            public ConditionalOutputImpl(ProcessBase processBase, VerbosityLevel level)
+            {
+                _Parent = processBase;
+                _Level = level;
+            }
+
+            public void EnsureNewLine(bool forceEmptyLine = false)
+            {
+                _Parent.Output.EnsureNewLine(_Level, forceEmptyLine);
+            }
+
+            public IDisposable Indent(int? numChars = null)
+            {
+                return _Parent.Output.Indent(_Level, numChars);
+            }
+
+            public IDisposable IndentFor(string header, int? numChars = null)
+            {
+                return _Parent.Output.IndentFor(_Level, header, numChars);
+            }
+
+            public ITableFormatter Table(Action<ITableBuilder> creator)
+            {
+                return _Parent.Output.Table(_Level, creator);
+            }
         }
     }
 }

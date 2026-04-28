@@ -52,19 +52,19 @@ PCNT  OCT 7               # of patterns to test... table follows!
 *  HIGH byte as word first, low byte second...
 *
 PATAD DEF *+1
+      OCT 0             0000 0000 0000 0000
       OCT 0
-      OCT 0
+      OCT 377           1111 1111 1111 1111
       OCT 377
-      OCT 377
+      OCT 252           1010 1010 1010 1010
       OCT 252
-      OCT 252
+      OCT 125           0101 0101 0101 0101 
       OCT 125
-      OCT 125
+      OCT 360           1111 0000 1111 0000
       OCT 360
-      OCT 360
+      OCT 17            0000 1111 0000 1111
       OCT 17
-      OCT 17
-      OCT 377
+      OCT 377           1111 1111 1111 0000
       OCT 360
 *
 *

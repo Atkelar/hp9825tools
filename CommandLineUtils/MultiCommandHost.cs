@@ -159,7 +159,7 @@ namespace CommandLineUtils
             p.WriteReturnCodeHelp(Output);
         }
 
-  /// <summary>
+        /// <summary>
         /// Sets up the banner message for the program.
         /// </summary>
         /// <typeparam name="T">Base type for the assembly version; will be used to pull the version number.</typeparam>
@@ -202,7 +202,7 @@ namespace CommandLineUtils
 
         private string? BannerMessage = null;
 
-        public OutputHandlerBase? Output {get;private set;}
+        public OutputHandlerBase Output {get;private set;} = ProcessBase.NullOutput;
 
         /// <summary>
         /// Provide an output handler implementation. If not specified, the normal console will be used.
@@ -279,14 +279,9 @@ namespace CommandLineUtils
                         if (await thisCommand.Parse(newArgs) != null)
                             throw ReturnCode.ParseError.Happened($"Command '{cmd}' requsted help. Use global help command instead!");
                         
-                        if (Output == null)
-                        {
-                            var x = new ConsoleBasedOutput();
-                            x.Prepare(VerbosityLevel.Normal);
-                            this.OutputTo(x);
-                        }
+                        EnsureOutput();
 
-                        thisCommand.SetOutput(Output!);
+                        thisCommand.ChangeOutput(Output!);
                         if (BannerMessage != null)
                         {
                             Output?.WriteLine(VerbosityLevel.Normal, BannerMessage);
@@ -297,28 +292,29 @@ namespace CommandLineUtils
             }
             catch (ReturnCodeException ex)
             {
-                if (Output == null)
-                {
-                    var x = new ConsoleBasedOutput();
-                    x.Prepare(VerbosityLevel.Normal);
-                    this.OutputTo(x);
-                }
+                EnsureOutput();
                 Output?.WriteLine(ex.IsNonError ?  VerbosityLevel.Normal : VerbosityLevel.Errors, SplitMode.Word, ex.Message);
                 return ex.Code;
             }
             catch(Exception ex)
             {
-                if (Output == null)
-                {
-                    var x = new ConsoleBasedOutput();
-                    x.Prepare(VerbosityLevel.Normal);
-                    this.OutputTo(x);
-                }
+                EnsureOutput();
                 Output?.WriteLine(VerbosityLevel.Errors, SplitMode.Word, ReturnCode.UhandledError.ErrorMessageTemplate, ex.Message);
                 return ReturnCode.UhandledError.Code;
             }
             return ReturnCode.Success.Code; 
         }
+
+        private void EnsureOutput()
+        {
+            if (Output == ProcessBase.NullOutput)
+            {
+                var x = new ConsoleBasedOutput();
+                x.Prepare(VerbosityLevel.Normal);
+                this.OutputTo(x);
+            }
+        }
+
         private bool IsDisposed = false;
 
         /// <summary>

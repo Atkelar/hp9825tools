@@ -180,14 +180,14 @@ namespace HP9825Simulator
                 item.IsEnabled = false;
             }
 
-            // tape.InsertCartridge(TapeCartridge.Create("Testing"));
+            // tape.InsertCartridge(TapeCartridge.Create("Testing2"));
             // TestTapeDrive1(kdp);
             tape.InsertCartridge(await TapeCartridge.Load("private/test.tape"));
-            //TestTapeDriveList(kdp);
+            TestTapeDriveList(kdp);
             //TestTapeDrive2(kdp);
             //TestTapeDrive3(kdp);
             //TestTapeDrive4(kdp);
-            TestTapeDrive5(kdp);
+            //TestTapeDrive5(kdp);
 
             // TestMandelbrot(kdp, false);
             // kdp.PutKeyPresses("list", TimeSpan.FromSeconds(1));

@@ -110,9 +110,11 @@ namespace HP9825CPU
             }
         }
 
-        public static Memory MakeMemory(bool use16Bit, int startOffset = 0, int? blockSize = null)
+        public static Memory MakeMemory(bool use16Bit, int startOffset = 0, int? blockSize = null, bool allowArbitraryLength = false)
         {
             int maxSize = use16Bit ? 0x10000 : 0x8000;
+            if (allowArbitraryLength)
+                maxSize = 1024*1024*10; // reasonable...
             if (startOffset < 0 || startOffset + 1 >= maxSize)
                 throw new ArgumentOutOfRangeException(nameof(startOffset), startOffset, "Lower bound out of range!");
             int size = blockSize.GetValueOrDefault(maxSize);

@@ -38,7 +38,7 @@ namespace HP9825Utils
         {
             if (string.IsNullOrWhiteSpace(Output!.Filename)) // TODO: build some overide capability for mandatory/positional settings! Syntax and parsing updates would be nice...
                 throw ReturnCode.ParseError.Happened("Filename", "Ouptut file name is missing!");
-            Memory mem = Memory.MakeMemory(Local!.Use16Bit);
+            Memory mem = Memory.MakeMemory(Local!.Use16Bit, allowArbitraryLength: true);
             if (Local!.Negate)
             {
                 for(int i = 0; i < mem.Length; i++)

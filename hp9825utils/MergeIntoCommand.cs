@@ -47,7 +47,7 @@ namespace HP9825Utils
             if (offs < 0 || offs + length > source.Length)
                 throw Errors!.Happened(MergeErrors.TargetRangeInvalid, length, offs, source.Length);
 
-            Out?.WriteLine(VerbosityLevel.Normal, SplitMode.Word, "Merging {1:x4} words to {0:x4}.", offs, length);
+            Output?.WriteLine(VerbosityLevel.Normal, SplitMode.Word, "Merging {1:x4} words to {0:x4}.", offs, length);
 
             int ti, td;
             if (Local.Reverse)

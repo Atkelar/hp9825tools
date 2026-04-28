@@ -109,7 +109,14 @@ namespace HP9825CPU
             SetRom(new MemoryRange(0, 12288));
         }
 
-        private void TranslateRomOptions(OptionRom wellknown, out int address, out int length)
+        /// <summary>
+        /// Translate the well known ROM pack option address space.
+        /// </summary>
+        /// <param name="wellknown">The ROM to translate.</param>
+        /// <param name="address">Receives the target address, as "word" address.</param>
+        /// <param name="length">Receives the legnth (in words).</param>
+        /// <exception cref="ArgumentOutOfRangeException">Unknown option ROM requested.</exception>
+        public static void TranslateRomOptions(OptionRom wellknown, out int address, out int length)
         {
             length = 1024;  // most roms are...
             switch(wellknown)
