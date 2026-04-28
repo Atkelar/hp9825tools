@@ -2119,8 +2119,9 @@ namespace HP9825CPU
         /// </summary>
         /// <param name="path">The export file name.</param>
         /// <param name="format">The requested diagnostic format.</param>
+        /// <param name="comment">An additional comment to add to the log file - can be multilined - null for no comment.</param>
         /// <param name="clearLog">True to clear the log after save (transactional) or falst to keep the entries.</param>
-        public async Task SaveDiagnosticLog(string path, LogExportFormat format, bool clearLog = false)
+        public async Task SaveDiagnosticLog(string path, LogExportFormat format, string? comment = null, bool clearLog = false)
         {
             var saveThis = _DiagnosticLog;
             DiagLogEntry? audit = null;
@@ -2142,10 +2143,10 @@ namespace HP9825CPU
                 switch (format)
                 {
                     case LogExportFormat.Text:
-                        await SaveDiagnosticLogText(path, saveThis);
+                        await SaveDiagnosticLogText(path, saveThis, comment);
                         break;
                     case LogExportFormat.Html:
-                        await SaveDiagnosticLogHtml(path, saveThis);
+                        await SaveDiagnosticLogHtml(path, saveThis, comment);
                         break;
                     default:
                         throw new NotImplementedException();
@@ -2168,15 +2169,15 @@ namespace HP9825CPU
             }
         }
 
-        private async Task SaveDiagnosticLogHtml(string path, List<DiagLogEntry> saveThis)
+        private async Task SaveDiagnosticLogHtml(string path, List<DiagLogEntry> saveThis, string? comment)
         {
             using(var f = System.IO.File.CreateText(path))
             {
-                await SaveDiagnosticLogHtml(f, saveThis);
+                await SaveDiagnosticLogHtml(f, saveThis, comment);
             }
         }
 
-        private async Task SaveDiagnosticLogHtml(TextWriter f, List<DiagLogEntry> saveThis)
+        private async Task SaveDiagnosticLogHtml(TextWriter f, List<DiagLogEntry> saveThis, string? comment)
         {
             await f.WriteLineAsync(@"<!DOCTYPE html>
 <html lang=""en"">
@@ -2186,8 +2187,27 @@ namespace HP9825CPU
         </style>
     </head>
     <body>");
-
             await f.WriteLineAsync(string.Format("<h1>Log created {0:yyyy-MM-dd HH:mm:ss}</h2>", DateTime.Now));
+            if (!string.IsNullOrWhiteSpace(comment))
+            {
+                await f.WriteLineAsync("<p>");
+                var list = comment.Split('\n', StringSplitOptions.TrimEntries);
+                for(int i = 0;i<list.Length;i++)
+                {
+                    var s = list[i];
+                    if (s.Length == 0)
+                    {
+                        await f.WriteLineAsync("</p><p>");
+                    }
+                    else
+                    {
+                        await f.WriteLineAsync(HtmlEncoder.Default.Encode(s));
+                        if(i < list.Length-1 && list[i+1].Length>0)
+                            await f.WriteLineAsync("<br/>");
+                    }
+                }
+                await f.WriteLineAsync("</p>");
+            }
             int count = 0;
             await f.WriteLineAsync("<table><tr><th>#</th><th>when [µs]</th><th>where</th><th>?</th><th>Message</th></tr>");
             foreach(var item in saveThis)
@@ -2201,16 +2221,32 @@ namespace HP9825CPU
 </html>");
         }
 
-        private async Task SaveDiagnosticLogText(string path, List<DiagLogEntry> saveThis)
+        private async Task SaveDiagnosticLogText(string path, List<DiagLogEntry> saveThis, string? comment)
         {
-            throw new NotImplementedException();
+            using(var f = System.IO.File.CreateText(path))
+            {
+                await SaveDiagnosticLogText(f, saveThis, comment);
+            }
+        }
+
+        private async Task SaveDiagnosticLogText(StreamWriter f, List<DiagLogEntry> saveThis, string? comment)
+        {
+            await f.WriteLineAsync("# Uptime [us]; Category; PC; Message");
+            if (!string.IsNullOrWhiteSpace(comment))
+            {
+                await f.WriteLineAsync("#");
+                foreach(var s in comment.Split('\n', StringSplitOptions.TrimEntries))
+                {
+                    await f.WriteAsync("# ");
+                    await f.WriteLineAsync(s);
+                }
+            }
+            await f.WriteLineAsync("#");
+            foreach(var l in saveThis)
+            {
+                await f.WriteLineAsync(string.Format("{0:0.0000};{1};{2};\"{3}\"", l.UpTime?.Microseconds, l.Category, l.ProgramCounter, l.Message));
+            }
         }
         #endregion
-    }
-
-    public enum LogExportFormat
-    {
-        Text,
-        Html
     }
 }

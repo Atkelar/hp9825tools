@@ -51,7 +51,7 @@ namespace HP9825Simulator
                             Simulator?.Tick(); 
                             return true;
                         case ExportDiagLogCommand:
-                            Simulator?.SaveDiagnosticLog($"private/diag-{DateTime.Now:MMdd-HHmmss}.html", LogExportFormat.Html, false).Wait();
+                            Simulator?.SaveDiagnosticLog($"private/diag-{DateTime.Now:MMdd-HHmmss}.html", LogExportFormat.Html, "Hard coded test...", false).Wait();
                             return true;
                         case RunCommand:
                             Simulator?.Run(true, 10 * Simulator.ClockFrequency);    // 10 "second" timeout...
