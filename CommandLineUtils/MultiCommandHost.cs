@@ -153,7 +153,7 @@ namespace CommandLineUtils
                 Output.Write( VerbosityLevel.Normal, SplitMode.Word, selected.HelpMessage);
                 Output.WriteLine( VerbosityLevel.Normal);
             }
-            ProcessBase p = selected.CreateImplementation(CommandName, IgnoreCase, cmd, false);
+            ProcessBase p = selected.CreateImplementation(CommandName, IgnoreCase, cmd, false, _OptionalConfigs);
             p.WriteExtendedHelp(Output, page);
             p.WriteHelpText(Output);
             p.WriteReturnCodeHelp(Output);
@@ -234,7 +234,7 @@ namespace CommandLineUtils
             {
                 if (args.Length == 0)
                 {
-                    throw ReturnCode.ParseError.Happened("<value not provided>", "Command is missing!");
+                    throw ReturnCode.ParseError.Happened("command", "Command to run is missing! Use 'help' for an overview!");
                 }
                 else
                 {
@@ -347,5 +347,18 @@ namespace CommandLineUtils
             }
             IsDisposed = true;
         }
-   }
+
+
+        private List<string>? _OptionalConfigs = null;
+
+        /// <summary>
+        /// Adds an additoinal - app specific - configuration file.
+        /// </summary>
+        /// <param name="path">The path (can include ~/ sequences and %environement% variables!)</param>
+        public void AddOptionalDefaults(string path)
+        {
+            _OptionalConfigs ??= new List<string>();
+            _OptionalConfigs.Add(PathUtils.ExpandPath(path));
+        }
+    }
 }

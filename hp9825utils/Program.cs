@@ -11,6 +11,10 @@ namespace HP9825Utils
             using(var host = new MultiCommandHost("hp9825utils"))
             {
                 host.SetupBanner<Program>("9825 CPU Tools", "Atkelar", 2026);
+                host.AddOptionalDefaults("~/.hp9825/hp9825.defaults");
+                host.AddOptionalDefaults(".hp9825.defaults");
+                host.AddOptionalDefaults("~/.hp9825/hp9825util.defaults");
+                host.AddOptionalDefaults(".hp9825util.defaults");
 
                 host.Register<InvertBitsCommand>();
                 host.Register<CreateImageCommand>();

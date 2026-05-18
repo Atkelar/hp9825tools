@@ -12,6 +12,10 @@ namespace HP9825Disassembler
             using(var host = new SingleCommandHost<DisassembleCommand>("hp9825dasm", true))
             {
                 host.SetupBanner<Program>("9825 CPU Disassembler", "Atkelar", 2026);
+                host.AddOptionalDefault("~/.hp9825/hp9825.defaults");
+                host.AddOptionalDefault("hp9825.defaults");
+                host.AddOptionalDefault("~/.hp9825/hp9825dasm.defaults");
+                host.AddOptionalDefault("hp9825dasm.defaults");
                 return await host.Run(args);
             }
         }

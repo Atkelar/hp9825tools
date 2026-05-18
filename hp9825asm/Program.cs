@@ -17,6 +17,10 @@ namespace HP9825Assembler
             using(var host = new SingleCommandHost<AssemberCommand>("hp9825asm", true))
             {
                 host.SetupBanner<Program>("9825 CPU Assembler", "Atkelar", 2026);
+                host.AddOptionalDefault("~/.hp9825/hp9825.defaults");
+                host.AddOptionalDefault("hp9825.defaults");
+                host.AddOptionalDefault("~/.hp9825/hp9825asm.defaults");
+                host.AddOptionalDefault("hp9825asm.defaults");
                 return await host.Run(args);
             }
         }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace CommandLineUtils
@@ -211,10 +212,13 @@ namespace CommandLineUtils
         /// <summary>
         /// Call this to bootstrap the object. Initialized commands and return codes.
         /// </summary>
-        public void Prepare(bool supportsHelp = true)
+        public void Prepare(bool supportsHelp = true, IEnumerable<string>? additionalConfigFiles = null)
         {
             _Parameters = new ParameterHandler(CommandName, IgnoreCase);
             _Parameters.SupportsHelp = supportsHelp;
+            if (additionalConfigFiles != null)
+                foreach(var file in additionalConfigFiles)
+                    _Parameters.AddOptionalDefault(file);
             BuildArguments(_Parameters);
             var rc = new ReturnCodeHandler(true);
             if(BuildReturnCodes(rc))

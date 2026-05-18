@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 
 namespace CommandLineUtils
 {
@@ -10,7 +12,7 @@ namespace CommandLineUtils
         public string? HelpMessage { get; set; }
         public Type Implementation { get; set; }
 
-        public ProcessBase CreateImplementation(string cmdName, bool ignoreCase, string procName, bool supportsHelp)
+        public ProcessBase CreateImplementation(string cmdName, bool ignoreCase, string procName, bool supportsHelp, IEnumerable<string>? additionalConfigFiles = null)
         {
             ProcessBase? p = Activator.CreateInstance(Implementation) as ProcessBase;
             if (p == null)
@@ -18,7 +20,7 @@ namespace CommandLineUtils
             p.CommandName = cmdName;
             p.IgnoreCase = ignoreCase;
             p.ProcessName = procName;
-            p.Prepare(supportsHelp);
+            p.Prepare(supportsHelp, additionalConfigFiles);
             return p;
         }
     }

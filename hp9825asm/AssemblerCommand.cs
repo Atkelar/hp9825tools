@@ -30,8 +30,6 @@ namespace HP9825Assembler
         {
             ContextParameters = builder.AddOptions<AssemblerContextParameters>();
             Format = builder.AddOptions<ListingFormatOptions>("fmt");
-            builder.AddOptionalDefault("hp9825.defaults");
-            builder.AddOptionalDefault("hp9825dasm.defaults");
         }
 
         AssemblerContextParameters ContextParameters {get;set;}

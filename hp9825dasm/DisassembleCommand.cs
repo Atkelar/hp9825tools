@@ -30,8 +30,6 @@ namespace HP9825Disassembler
             InputParameters = builder.AddOptions<InputFileOptions>();
             ContextParameters = builder.AddOptions<DisassemblerContextParameters>();
             Format = builder.AddOptions<ListingFormatOptions>("fmt");
-            builder.AddOptionalDefault("hp9825.defaults");
-            builder.AddOptionalDefault("hp9825asm.defaults");
         }
 
         protected override async Task RunNow()

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -203,8 +204,8 @@ namespace CommandLineUtils
                 }
             }
             impl.WriteExtendedHelp(Output, page);
-            impl?.WriteHelpText(Output);
-            impl?.WriteReturnCodeHelp(Output);
+            impl.WriteHelpText(Output);
+            impl.WriteReturnCodeHelp(Output);
             return 0;
         }
 
@@ -223,7 +224,7 @@ namespace CommandLineUtils
             try
             {
                 // parse args for verbosity control...
-                var cmd = _Command.CreateImplementation(CommandName, IgnoreCase, string.Empty, true);
+                var cmd = _Command.CreateImplementation(CommandName, IgnoreCase, string.Empty, true, _OptionalConfigs);
                 cmd.Prepare(true);
 
                 string? helpPage = await cmd.Parse(args);
@@ -272,5 +273,17 @@ namespace CommandLineUtils
         private string? BannerMessage = null;
 
         private CommandRegistration? _Command;
+
+        private List<string>? _OptionalConfigs = null;
+        /// <summary>
+        /// Adds an additoinal - app specific - configuration file.
+        /// </summary>
+        /// <param name="path">The path (can include ~/ sequences and %environement% variables!)</param>
+        public void AddOptionalDefault(string path)
+        {
+            _OptionalConfigs ??= new List<string>();
+            _OptionalConfigs.Add(PathUtils.ExpandPath(path));
+        }
+
     }
 }

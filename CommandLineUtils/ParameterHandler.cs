@@ -74,11 +74,11 @@ namespace CommandLineUtils
         /// <summary>
         /// Adds a file to read before the actual command line parsing takes place.
         /// </summary>
-        /// <param name="filename">The filename.</param>
-        public void AddOptionalDefault(string filename)
+        /// <param name="path">The filename.</param>
+        public void AddOptionalDefault(string path)
         {
             _OptionalDefaults ??= new List<string>();
-            _OptionalDefaults.Add(filename);
+            _OptionalDefaults.Add(PathUtils.ExpandPath(path));
         }
 
         private List<string>? _OptionalDefaults = null;
@@ -440,6 +440,21 @@ namespace CommandLineUtils
                         }
                     }
                 }
+            }
+            if (_OptionalDefaults != null && _OptionalDefaults.Count > 0)
+            {
+                target.WriteLine(VerbosityLevel.Normal);
+                target.WriteLine(VerbosityLevel.Normal, SplitMode.None, "The command will look for the following configuration files, in order:");
+                using(target.Indent(VerbosityLevel.Normal))
+                {
+                    foreach(var p in _OptionalDefaults)
+                    {
+                        target.WriteLine(VerbosityLevel.Normal, SplitMode.None, p);
+                    }
+                }
+                target.WriteLine(VerbosityLevel.Normal);
+                target.WriteLine(VerbosityLevel.Normal, SplitMode.Word, "The config files are in basic 'ini' file syntax: name=value; use # for comment lines. Double quotes can be used to encode whitespaces in values, double-double quotes to escape them inside a string. Sections [xy] are supported too, their use depends on the command in question. The non-section before the first section is always applied, the others only if the program calls for it. The files are read in order and later ones replace values from earlier ones.");
+                target.WriteLine(VerbosityLevel.Normal);
             }
         }
 
