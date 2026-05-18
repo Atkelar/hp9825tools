@@ -69,12 +69,12 @@ namespace CommandLineUtils
         {
             switch(level)
             {
-                case VerbosityLevel.Errors:
+                case VerbosityLevel.Error:
                     if (Console.IsErrorRedirected)
                         return new FileBasedSpec(Console.Error);
                     else
                         return new ConsoleSpec(ConsoleColor.Red);
-                case VerbosityLevel.Warnings:
+                case VerbosityLevel.Warning:
                     if (WarningsInError && Console.IsErrorRedirected)
                         return new FileBasedSpec(Console.Error);
                     else

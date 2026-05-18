@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Xml;
 
 namespace HP9825CPU
 {
@@ -40,6 +41,15 @@ namespace HP9825CPU
                     goto case MemoryFaultMode.StuckOff;
             }
             throw new NotImplementedException();
+        }
+
+        internal void SaveState(XmlElement target)
+        {
+            target.SetAttribute("start", this.FirstAddress.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            target.SetAttribute("end", this.LastAddress.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            target.SetAttribute("mode", this._Mode.ToString());
+            target.SetAttribute("mask", this._BitMask.ToString("x"));
+            target.SetAttribute("toggle", this._Toggle ? "true" : "false");
         }
     }
 }

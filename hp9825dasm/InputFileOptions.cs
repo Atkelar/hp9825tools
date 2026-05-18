@@ -27,8 +27,11 @@ namespace HP9825Disassembler
         [Argument("o", "Offset", HelpText = "The input file is loaded into a 'working memory'. Normally, it is loaded to address 0 in that, but it can be moved to any (word!) offset here.", DefaultValue = "0")]
         public int LoadToOffset { get; set; } = 0;
 
-        [Argument("s", "Size", HelpText = "The number of bytes to read; when not specified, reads until either the file or the working memory is exhausted. When specified, will be range checked.")]
+        [Argument("s", "Size", HelpText = "The number of words to read; when not specified, reads until either the file or the working memory is exhausted. When specified, will be range checked.")]
         public int LoadSize { get; set; } = -1;
+
+        [Argument("x", "SkipWords", HelpText = "The number of words in the input to skip before loading the requested block.", DefaultValue = "0")]
+        public int SkipWords {get;set;} = 0;
 
         public Memory MakeBuffer()
         {
@@ -50,8 +53,6 @@ namespace HP9825Disassembler
             SizeProblem=2,
             [ReturnCode("Range specification invalid. Requested {0}-{1}, valid {2}-{3} ({4})", HelpMessage = "Happens when the input range (offset/length) results in an invalid range.")]
             RangeProblem=3,
-         
-           
         }
 
         public async Task<(int Offset, int WordCount, string ActualFilename)> ReadBuffer(Memory mem)
@@ -81,7 +82,11 @@ namespace HP9825Disassembler
                 // number of words...
                 if (LoadSize < 0)
                 {
-                    size = Math.Min(size, (int)fil.Length);
+                    size = Math.Min(size, (int)(fil.Length - SkipWords));
+                    if (size<=0)
+                    {
+                        throw Errors!.Happened(InputRelatedErrors.RangeProblem, 0, LoadSize, 0, fil.Length, "The file size was too small for the requesed length/skip!");
+                    }
                 }
                 else
                 {
@@ -89,9 +94,9 @@ namespace HP9825Disassembler
                     {
                         throw Errors!.Happened(InputRelatedErrors.RangeProblem, ofs, ofs+LoadSize, 0, mem.Length, "Size parameter invalid");
                     }
-                    if (LoadSize > fil.Length)
+                    if (LoadSize + SkipWords > fil.Length)
                     {
-                        throw Errors!.Happened(InputRelatedErrors.RangeProblem, 0, LoadSize, 0, fil.Length, "The file size was too small for the requesed length!");
+                        throw Errors!.Happened(InputRelatedErrors.RangeProblem, 0, LoadSize, 0, fil.Length, "The file size was too small for the requesed length/skip!");
                     }
                     size = LoadSize;
                 }
@@ -100,6 +105,11 @@ namespace HP9825Disassembler
                 {
                     using (var brh = new BinaryReader(File.OpenRead(hFile)))
                     {
+                        if (SkipWords > 0)
+                        {
+                            brl.BaseStream.Seek(SkipWords, SeekOrigin.Begin);
+                            brh.BaseStream.Seek(SkipWords, SeekOrigin.Begin);
+                        }
                         mem.LoadDual8Bit(brl, brh, ofs, size);
                     }
                 }
@@ -114,17 +124,20 @@ namespace HP9825Disassembler
                     if ((fi.Length % 2) != 0)
                         throw Errors!.Happened(InputRelatedErrors.SizeProblem, inputfile, fi.Length, "file not word-aligned!");
                     size = Math.Min(size, (int)fi.Length / 2);
+                    if (size + (SkipWords*2) > fi.Length)
+                        throw Errors!.Happened(InputRelatedErrors.RangeProblem, 0, LoadSize, 0, fi.Length / 2, "The file size was too small for the requesed length/skip!");
                 }
                 else
                 {
                     if (LoadSize == 0 || LoadSize + ofs > mem.Length)
                         throw Errors!.Happened(InputRelatedErrors.RangeProblem, ofs, ofs+LoadSize, 0, mem.Length, "The requested offset/length doesn't add up.");
-                    if (LoadSize * 2 > fi.Length)
-                        throw Errors!.Happened(InputRelatedErrors.RangeProblem, 0, LoadSize, 0, fi.Length / 2, "The file size was too small for the requesed length!");
+                    if (LoadSize * 2 + SkipWords * 2 > fi.Length)
+                        throw Errors!.Happened(InputRelatedErrors.RangeProblem, 0, LoadSize, 0, fi.Length / 2, "The file size was too small for the requesed length/skip!");
                     size = LoadSize;
                 }
                 using (var br = new BinaryReader(File.OpenRead(inputfile)))
                 {
+                    br.BaseStream.Seek(SkipWords*2, SeekOrigin.Begin);
                     mem.Load16Bit(br, ofs, size, !UseLittleEndian);
                 }
             }

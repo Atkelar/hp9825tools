@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace HP9825CPU
 {
+    // A single run ("streak") of tape data, following a specific "gap" without data.
     internal class DataStreak
     {
         public DataStreak(double start, double end, double gap)

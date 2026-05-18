@@ -101,7 +101,7 @@ namespace HP9825Disassembler
                 {
                     try
                     {
-                        map =  await MappingFile.ReadFrom(r, x => Output.WriteLine(VerbosityLevel.Warnings, SplitMode.Word, "{0}:{1}", tryFile, x));
+                        map =  await MappingFile.ReadFrom(r, x => Output.WriteLine(VerbosityLevel.Warning, SplitMode.Word, "{0}:{1}", tryFile, x));
                     }
                     catch(MappingFileFormatError ex)
                     {

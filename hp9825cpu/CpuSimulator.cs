@@ -3,11 +3,15 @@ using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Packaging;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Encodings.Web;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using System.Xml;
+using System.Xml.Schema;
 using Microsoft.VisualBasic;
 
 namespace HP9825CPU
@@ -1852,7 +1856,9 @@ namespace HP9825CPU
                     throw new InvalidOperationException("CPU is in failed state!");
             }
             _memBreakHit = null;
-            ChangeState(SimulatorState.Running); // set here, so any subsequent code can update to other states.
+            bool wasPaused = State == SimulatorState.Paused;
+            if (State != SimulatorState.Running) 
+                ChangeState(SimulatorState.Running); // set here, so any subsequent code can update to other states.
             HandleDeviceTick();
             if(State == SimulatorState.FailedState)
                 return;
@@ -1867,23 +1873,32 @@ namespace HP9825CPU
             }
             else
             {
-                var opCode = ExeOpcode.GetValueOrDefault(Memory[PC]);   // "EXE" result first... if again, we'll loop...
-                ExeOpcode = null;
-                var bp = Disassembler.BasePattern(opCode);
-                if (!Handlers.TryGetValue(bp, out var thisHandler))
+                // no interrupt requested... maybe DMA? If mode is none, we ignore the request as per spec.
+                if (DmaMode != DmaMode.None && Devices.IsDMARequested)
                 {
-                    Fail($"OpCode {opCode} from {PC} is not recognized!");
-                    result = new InstructionResult();
+                    result = HandleDMACycle();
                 }
                 else
                 {
-                    if (_Tracepoints != null && _Tracepoints.TryGetValue(PC, out var tpl))
+                    // CPU can "tick"...
+                    var opCode = ExeOpcode.GetValueOrDefault(Memory[PC]);   // "EXE" result first... if again, we'll loop...
+                    ExeOpcode = null;
+                    var bp = Disassembler.BasePattern(opCode);
+                    if (!Handlers.TryGetValue(bp, out var thisHandler))
                     {
-                        foreach(var t in tpl)
-                            t.Triggerred(this);
+                        Fail($"OpCode {opCode} from {PC} is not recognized!");
+                        result = new InstructionResult();
                     }
-                    ResetTiming();
-                    result = thisHandler(opCode);
+                    else
+                    {
+                        if (_Tracepoints != null && _Tracepoints.TryGetValue(PC, out var tpl))
+                        {
+                            foreach(var t in tpl)
+                                t.Triggerred(this);
+                        }
+                        ResetTiming();
+                        result = thisHandler(opCode);
+                    }
                 }
             }
             if (State != SimulatorState.FailedState)    // only tick over if we are still in a valid state...
@@ -1907,6 +1922,60 @@ namespace HP9825CPU
                 {
                     ChangeState(SimulatorState.BreakPointHit);
                 }
+            }
+            // if we arrived here paused, exit paused.
+            if(State == SimulatorState.Running && wasPaused)
+                ChangeState(SimulatorState.Paused);
+        }
+
+        private InstructionResult HandleDMACycle()
+        {
+            try
+            {
+                var dmamem = ReadRegister(CpuRegister.DMAMA);
+                DmaDirection moveTo = Memory.Use16Bit ? DmaDirection : (((dmamem & 0x8000) != 0) ? DmaDirection.MemoryToIO : DmaDirection.IOToMemory);
+                int dmamemaddr = Memory.Use16Bit ? dmamem : (dmamem & 0x7FFF);
+                if (moveTo == DmaDirection.Unspecified)
+                    throw new InvalidOperationException("DMA mode without direction!?");
+
+                bool doMemory = false;
+                switch (DmaMode)
+                {
+                    case DmaMode.None:
+                        throw new InvalidOperationException("Invalid call; should be preventd on the outside!");
+                    case DmaMode.PulseCount:
+                        break;
+                    case DmaMode.Dma:
+                        doMemory = true;
+                        break;
+                }
+                var dmac = ReadRegister(CpuRegister.DMAC);
+                var dmapa = ReadRegister(CpuRegister.DMAPA);
+                bool signalLast = (dmac == 0);
+                dmac--;
+                int data;
+                switch (moveTo)
+                {
+                    case DmaDirection.MemoryToIO:
+                        data = doMemory ? Memory[dmamemaddr] : 0;
+                        Devices.WriteIORegister(dmapa, signalLast ? 2 : 0, data);
+                        dmamem++;
+                        break;
+                    case DmaDirection.IOToMemory:
+                        data = Devices.ReadIORegister(dmapa, signalLast ? 2 : 0);
+                        if (doMemory) 
+                            Memory[dmamemaddr] = data;
+                        dmamem++;
+                        break;
+                }
+                WriteRegister(CpuRegister.DMAC, (dmac & 0xFFFF));
+                WriteRegister(CpuRegister.DMAMA, (dmamem & 0xFFFF));
+                return InstructionResult.TicksDelta(10 + (doMemory ? (moveTo == DmaDirection.MemoryToIO ? ReadMemoryCycles : WriteMemoryCycles) : 0), 0); // assumption! No way of knowing exactly yet.
+            }
+            catch(Exception ex)
+            {
+                Fail($"Error in DMA mode: {ex.Message}");
+                return InstructionResult.TicksDelta(0,0);
             }
         }
 
@@ -2012,6 +2081,25 @@ namespace HP9825CPU
         public bool IsFreeRunning { get; private set; }
         public bool DebugBinaryCode { get; set; }
 
+        private bool _StopRequested = false;
+
+        /// <summary>
+        /// Request that the <see cref="Run"/> loop (executing on another thread most likely) to terminate.
+        /// </summary>
+        public void Stop()
+        {
+            _StopRequested = true;
+        }
+
+        public double? SpeedFactor { get; private set; }
+
+        /// <summary>
+        /// Starts a free-run cycle of the emulator.
+        /// </summary>
+        /// <param name="realTime">True if the emulator is supposed to wait after each tick. This also enables the <see cref="SpeedFactor"/> property.</param>
+        /// <param name="tickLimit">Provides a number of ticks to run at most.</param>
+        /// <returns>The task object.</returns>
+        /// <exception cref="InvalidOperationException">The call isn'T valid for the current state of the emulator.</exception>
         public async Task Run(bool realTime = false, long? tickLimit = null)
         {
             if (IsFreeRunning)
@@ -2019,12 +2107,15 @@ namespace HP9825CPU
             if(State == SimulatorState.FailedState || State ==  SimulatorState.Created)
                 throw new InvalidOperationException("Simulator state is invalid for free running mode. Needs to be properly reset first!");
             IsFreeRunning = true;
+            SpeedFactor = null;
             DateTime startedRunning = DateTime.UtcNow;
             TimeSpan startedVirtual = UpTime.GetValueOrDefault();
             ChangeState(SimulatorState.Running);
             var startedAt = Ticks;
             if (tickLimit.HasValue)
                 tickLimit = startedAt + tickLimit.Value;
+            Stopwatch timer = Stopwatch.StartNew();
+            long lastTicks = timer.ElapsedTicks;
             while (State == SimulatorState.Running)
             {
                 try
@@ -2033,19 +2124,25 @@ namespace HP9825CPU
                     // check if "real time" is more than a ms behind simulated time, delay if so...
                     if (realTime)
                     {
-                        DateTime now = DateTime.UtcNow;
                         // TODO: wait if we run fast... tell the outside if we run slow...
+                        long nowTicks = timer.ElapsedTicks;
+
+                        // find out if we are behind the times or ahead... 
+                        // if we are lagging more than 10ms, add a call to delay with 9ms; that should keep us close.
+                        // the Speedfactor is the ratio between "waited" and "processing" time for the last second. 
+                        // So, only update every second or so...
                     }
-                    if(tickLimit.HasValue && tickLimit.Value < Ticks)
-                        break;
+                    if(State == SimulatorState.Running && (_StopRequested || (tickLimit.HasValue && tickLimit.Value < Ticks)))
+                        ChangeState(SimulatorState.Paused);
                 }
                 catch(Exception ex)
                 {
                     Fail(ex.Message);
                 }
             }
+            SpeedFactor = null;
+            _StopRequested = false; 
             IsFreeRunning = false;
-            OnStateChanged();   // report new state changed
         }
 
 
@@ -2245,6 +2342,67 @@ namespace HP9825CPU
             foreach(var l in saveThis)
             {
                 await f.WriteLineAsync(string.Format("{0:0.0000};{1};{2};\"{3}\"", l.UpTime?.Microseconds, l.Category, l.ProgramCounter, l.Message));
+            }
+        }
+        #endregion
+
+        #region State saving
+        public async Task SaveState(string filename, bool includeTape = true)
+        {
+            if (State == SimulatorState.Running)
+                throw new InvalidOperationException("Cannot save a running instance!");
+            using (var f = File.Create(filename))
+            {
+                await SaveState(f, includeTape);
+            }
+        }
+
+        public const string StateSaveNamespace = "https://schemas.atkelar.com/hp9825/state/v1";
+        
+        public async Task SaveState(FileStream f, bool includeTape)
+        {
+            if (State == SimulatorState.Running)
+                throw new InvalidOperationException("Cannot save a running instance!");
+            using (Package p = Package.Open(f, FileMode.CreateNew))
+            {
+                var doc = new XmlDocument();
+                doc.AppendChild(doc.CreateXmlDeclaration("1.0", null, null));
+                doc.AppendChild(doc.CreateComment(string.Format("Created {0} with library version {1}", DateTime.UtcNow, this.GetType().Assembly.GetName().Version)));
+                var root = doc.CreateElement("hp9825", StateSaveNamespace);
+                doc.AppendChild(root);
+
+                for(int i = 0; i < 32; i++)
+                {
+                    var reg = (CpuRegister)i;
+                    var value = ReadRegister(reg);
+                    root.SetAttribute(reg.ToString(), value.ToString("x"));
+                }
+
+                root.SetAttribute("callISR", this.CallInterruptServiceHandler);
+                root.SetAttribute("e", this.ERegister);
+                root.SetAttribute("dc", this.DecimalCarry);
+                root.SetAttribute("dmaDir", this.DmaDirection);
+                root.SetAttribute("dmaMode", this.DmaMode);
+                root.SetAttribute("ov", this.OVRegister);
+                root.SetAttribute("ticks", this.Ticks);
+                root.SetAttribute("relAddr", this.UseRelativeAddressing);
+                root.SetAttribute("halt", this.HaltActive);
+                root.SetAttribute("debugBin", this.DebugBinaryCode);
+                
+                var memManager = doc.CreateElement("memory", StateSaveNamespace);
+                root.AppendChild(memManager);
+                Memory.SaveState(memManager);
+                var devManager = doc.CreateElement("devices", StateSaveNamespace);
+                root.AppendChild(devManager);
+                Devices.SaveState(devManager);
+                var tapeDev = Devices.GetAt(1) as TapeDrive;
+                if (tapeDev != null && includeTape)
+                {
+                    if (tapeDev.Cartridge != null)
+                    {
+                        await tapeDev.Cartridge.SaveToPackageNoStateChange(p, "tape");
+                    }
+                }
             }
         }
         #endregion

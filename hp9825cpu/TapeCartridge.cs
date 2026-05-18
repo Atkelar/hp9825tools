@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Enumeration;
+using System.IO.Packaging;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -254,6 +255,8 @@ namespace HP9825CPU
                             UsedSize = x.Block.Data[3] * 2,
                             Type = x.Block.Data[4],
                             Generation = x.Block.Data[5],   // generation number - incremented on each save, must be same for all partitions.
+                            SecurityFlag = x.Block.Data[6],
+                            ExtendedFlag = x.Block.Data[7],
                             Checksum = x.Block.Data[8]
                         }
                     );
@@ -340,6 +343,7 @@ namespace HP9825CPU
         /// advances through a tape partition list and treats a long-gap as a EOF marker.
         /// </summary>
         private class StreamInterpreter
+            : ITapeFileReader
         {
             private LinkedBlock? _Now;
 
@@ -349,14 +353,14 @@ namespace HP9825CPU
 
             public bool EndOfFile => _EndOfFile;
 
-            private int Generation;
+            public int Generation { get; private set;}
             private int LastPartitionIndex;
 
             public StreamInterpreter(LinkedBlock fileHeader, int startAtIndex=0)
             {
                 _Now = fileHeader;
-                ReservedSize = fileHeader.Block.Data[2];
-                UsedSize = fileHeader.Block.Data[3];
+                ReservedSize = fileHeader.Block.Data[2] * 2;    // stored in words, retreived in byes...
+                UsedSize = fileHeader.Block.Data[3] * 2;
                 if (_Now.Block.Data[3] == 0 || _Now._Next == null)
                     _EndOfFile = true;
                 else
@@ -372,14 +376,14 @@ namespace HP9825CPU
             private void MoveToNextPartition()
             {
                 _Now = _Now?._Next;
-                if (_Now == null || _Now.Block.Gap > 0.05 || _Now.Block.Data.Count < 5)
+                if (_Now == null || _Now.Block.Gap > 0.05 || _Now.Block.Data.Count < 5 || _Now.Block.Data[0] == 0xFFFF || AbsoluteOffset >= UsedSize)
                     _EndOfFile = true;
                 else
                 {
                     // check up on partition header...
                     var x = _Now.Block.Data;
                     if (x[0] != 1 || x[5] != 1)
-                        throw new InvalidOperationException("Format error: partition doesn't start with 1.");
+                        throw new InvalidOperationException($"Format error: partition doesn't start with 1, @{_Now.Block.Start}; {AbsoluteOffset} of {UsedSize}");
                     if (!ValidateCheckSum(x, 1, 3, x[4]))
                         throw new InvalidOperationException("Partition header checksum error!");
                     int partNumber = x[1];
@@ -394,6 +398,7 @@ namespace HP9825CPU
                     if (!ValidateCheckSum(x, 6, 5+partLength, x[6+partLength]))
                         throw new InvalidOperationException("Partition body checksum error!");
 
+                    LastPartitionIndex = partNumber;
                     PartitionOffset = 0;
                     PartitionLength = partLength;
                 }
@@ -401,8 +406,6 @@ namespace HP9825CPU
 
             public int? ReadWord()
             {
-                if(PartitionOffset >= this.PartitionLength)
-                    _EndOfFile = true;
                 if (_EndOfFile)
                     return null;
                 // find next word...
@@ -411,7 +414,11 @@ namespace HP9825CPU
                 if (_EndOfFile)
                     return null;
                 var value = _Now?.Block.Data[PartitionOffset + 6];
-                PartitionOffset++;
+                PartitionOffset++;  // index (word #)
+                AbsoluteOffset+=2;  // byte
+                if(PartitionOffset >= PartitionLength)
+                    MoveToNextPartition();
+                    //_EndOfFile = true;  // for next iteration... or else we get stuck in "post file reads"...
                 return value;
             }
 
@@ -539,8 +546,10 @@ namespace HP9825CPU
             return root;
         }
 
-        private List<FileEntry> GetDirectory(int trackNumber)
+        internal List<FileEntry> GetDirectory(int trackNumber)
         {
+            if (_Tracks[trackNumber]== null)
+                return new List<FileEntry>();
             return GetDirectory(_Tracks[trackNumber]);
         }
 
@@ -589,24 +598,28 @@ namespace HP9825CPU
             }
         }
 
-
+        internal async Task SaveToPackageNoStateChange(Package target, string? namePrefix = null)
+        {
+            namePrefix = namePrefix != null ? "-" + namePrefix : string.Empty;
+            var mdf = target.CreatePart(new Uri($"/{namePrefix}metadata", UriKind.Relative), "text/xml", System.IO.Packaging.CompressionOption.Normal);
+            using (var tw = new StreamWriter(mdf.GetStream(FileMode.Create)))
+            {
+                await WriteMetadata(tw);
+            }
+            using (var trk = target.CreatePart(new Uri($"/{namePrefix}track-a", UriKind.Relative), "application/octet-stream", System.IO.Packaging.CompressionOption.Normal).GetStream(FileMode.Create))
+            {
+                await WriteTrack(_Tracks[0], trk);
+            }
+            using (var trk = target.CreatePart(new Uri($"/{namePrefix}track-b", UriKind.Relative), "application/octet-stream", System.IO.Packaging.CompressionOption.Normal).GetStream(FileMode.Create))
+            {
+                await WriteTrack(_Tracks[1], trk);
+            }
+        }
         private async Task SaveToPackage(string filename)
         {
             using(var pack = System.IO.Packaging.Package.Open(filename, FileMode.Create))
             {
-                var mdf = pack.CreatePart(new Uri("/metadata", UriKind.Relative), "text/xml", System.IO.Packaging.CompressionOption.Normal);
-                using (var tw = new StreamWriter(mdf.GetStream(FileMode.Create)))
-                {
-                    await WriteMetadata(tw);
-                }
-                using (var trk = pack.CreatePart(new Uri("/track-a", UriKind.Relative), "application/octet-stream", System.IO.Packaging.CompressionOption.Normal).GetStream(FileMode.Create))
-                {
-                    await WriteTrack(_Tracks[0], trk);
-                }
-                using (var trk = pack.CreatePart(new Uri("/track-b", UriKind.Relative), "application/octet-stream", System.IO.Packaging.CompressionOption.Normal).GetStream(FileMode.Create))
-                {
-                    await WriteTrack(_Tracks[1], trk);
-                }
+                await SaveToPackageNoStateChange(pack);
             }
             FixupMetadata();
         }
@@ -817,172 +830,6 @@ namespace HP9825CPU
                             }
                         }
                     }
-
-
-                    // // check where we need to cut the starting block...
-                    // if (landedInBlock.Block.Start + landedInBlock.Block.Gap > block.Start)
-                    // {
-                    //     // our new block gap is inside the existing gap...
-                    //     // this should take care of case C and B
-                    //     double newGapLength = (block.Start + block.Gap) - landedInBlock.Block.Start;
-                    //     // oops...
-                    //     var replacement = new LinkedBlock(new DataStreak(landedInBlock.Block.Start, block.End, newGapLength) { Data = block.Data });
-                    //     if (landedInBlock.Block.End - TapeDrive.Bit0ClockEveryInch*16 < block.End)
-                    //     {
-                    //         // we have no leftover data? Good. This replaces the current block completely.
-                    //         ReplaceBlock(landedInBlock, replacement);
-                    //         stretchesToBlock = landedInBlock = replacement;
-                    //     }
-                    //     else
-                    //     {
-                    //         // old block has leftover content.
-                    //         if(stretchesToBlock != landedInBlock)
-                    //             throw new InvalidOperationException("This should never happen!");
-                    //         int num = WordCountByDistance(landedInBlock.Block, block.End);
-                    //         // split the current block
-                    //         InsertBefore(stretchesToBlock, replacement);
-                    //         landedInBlock = replacement;
-                    //         if (num <= 0)
-                    //         {
-                    //             // and we even have a gap leftover...
-                    //             num = 0;
-                    //             newGapLength = Math.Max(0, (stretchesToBlock.Block.Start + stretchesToBlock.Block.Gap )-block.End);
-                    //         }
-
-                    //         replacement = new LinkedBlock(new DataStreak(block.End, stretchesToBlock.Block.End, newGapLength));
-                    //         for(int i = num; i < stretchesToBlock.Block.Data.Count; i++)
-                    //             replacement.Block.Data.Add(stretchesToBlock.Block.Data[i]);
-                    //         ReplaceBlock(stretchesToBlock, replacement);
-                    //         stretchesToBlock = landedInBlock;   // no cleanup needed here...
-                    //     }
-                    // }
-                    // else
-                    // {
-                    //     // *maybe* in data section...
-                    //     // if(block.Start + TapeDrive.Bit0ClockEveryInch > landedInBlock.Block.End)
-                    //     // {
-                    //     //     if (landedInBlock._Next==null)
-                    //     //     {
-                    //     //         // just append...
-                    //     //         landedInBlock._Next = new LinkedBlock(block);
-                    //     //         landedInBlock._Next._Prev = landedInBlock;
-                    //     //         stretchesToBlock = landedInBlock;   // no cleanup...
-                    //     //     }
-                    //     //     else
-                    //     //     {
-                    //     //         // tolerance is good, this is just the next block... tweak the gap anyhow, just in case.
-                    //     //         var replacement = new LinkedBlock(new DataStreak(landedInBlock.Block.End, block.End, block.Gap) { Data = block.Data});
-
-                    //     //         landedInBlock.Block.End = block.Start;
-                    //     //         // link to the next block as the new one. The landed block will be 
-                    //     //         landedInBlock = landedInBlock._Next = new LinkedBlock() { _Prev = landedInBlock, Block = block };
-                    //     //     }
-                    //     // }
-                    //     // else
-                    //     {
-                    //         // uh, oh... we landed in the data section...
-                    //         // trim data...
-                    //         int nWords = WordCountByDistance(landedInBlock.Block, block.Start);
-                    //         if (nWords == 0)
-                    //         {
-                    //             // no words left, pretend we landet in gap anyhwo.
-                    //             var newGap = (block.Start + block.Gap) - landedInBlock.Block.Start;
-
-                    //             if (landedInBlock.Block.End < block.End)
-                    //             {
-                    //                 // fully replaces the block in question...
-                    //                 if (stretchesToBlock == landedInBlock)
-                    //                     throw new InvalidOperationException("This should never happen!");
-                    //                 var replacement = new LinkedBlock(new DataStreak(landedInBlock.Block.Start, block.End, newGap) { Data = block.Data });
-                    //                 ReplaceBlock(landedInBlock, replacement);
-                    //                 landedInBlock = replacement;
-                    //             }
-                    //             else
-                    //             {
-                    //                 // only partially replaces the block, but still no words left; expand the gap of the following block if any.
-                    //                 if(stretchesToBlock != landedInBlock)
-                    //                     throw new InvalidOperationException("This should never happen!");
-                    //                 // split the current block
-
-                    //                 stretchesToBlock = landedInBlock._Next = new LinkedBlock()
-                    //                 {
-                    //                     _Next = landedInBlock._Next,
-                    //                     _Prev = landedInBlock,
-                    //                     Block = new DataStreak()
-                    //                     {
-                    //                         Start = block.End,
-                    //                         Gap = 0,
-                    //                         Data = new System.Collections.Generic.List<ushort>(),
-                    //                         End = landedInBlock.Block.End
-                    //                     }
-                    //                 };
-                    //                 if (stretchesToBlock._Next != null)
-                    //                     stretchesToBlock._Next._Prev = stretchesToBlock;
-                    //                 for(int i = num; i < landedInBlock.Block.Data.Count; i++)
-                    //                     stretchesToBlock.Block.Data.Add(landedInBlock.Block.Data[i]);
-                    //                 landedInBlock.Block.Data = block.Data;
-                    //             }
-                    //         }
-                    //         else
-                    //         {
-                    //             // cut out beginning of block...
-                    //             landedInBlock.Block.Data.RemoveRange(nWords, landedInBlock.Block.Data.Count - nWords);
-                    //             landedInBlock.Block.End = block.Start;
-                    //             // link to the next block as the new one. The landed block will be 
-                    //             landedInBlock = landedInBlock._Next = new LinkedBlock() { _Prev = landedInBlock, Block = block };
-                    //         }
-                    //     }
-                    // }
-                    // // now fix up the "next" block...
-                    // if (stretchesToBlock == null)
-                    //     landedInBlock._Next = null; // easy...
-                    // else
-                    // {
-                    //     if(landedInBlock != stretchesToBlock)
-                    //     {
-                    //         // link up the two ends of the string, snipping out any intermediates...
-                    //         landedInBlock._Next = stretchesToBlock;
-                    //         stretchesToBlock._Prev = landedInBlock;
-                    //         // did we land in the gap of the target block?
-                    //         if(landedInBlock.Block.End < stretchesToBlock.Block.Start + stretchesToBlock.Block.Gap)
-                    //         {
-                    //             // yes. Update gap length...
-                    //             ReplaceBlock(stretchesToBlock, new LinkedBlock(new DataStreak(landedInBlock.Block.End, stretchesToBlock.Block.End, (stretchesToBlock.Block.Start + stretchesToBlock.Block.Gap) - landedInBlock.Block.End) { Data = landedInBlock.Block.Data}));
-                    //             // Data length is the same, just trimmed the gap...
-                    //         }
-                    //         else
-                    //         {
-                    //             // we are in the data section. Remove gap and trim data...
-                    //             int numWords = WordCountByDistance(stretchesToBlock.Block, landedInBlock.Block.End) + 1;    // make sure we use "ceiling" here...
-                    //             if (numWords == 0)  // no more data left?!
-                    //             {
-                    //                 landedInBlock._Next = stretchesToBlock._Next;
-                    //                 if (landedInBlock._Next != null)
-                    //                 {
-                    //                     landedInBlock._Next._Prev = landedInBlock;
-                    //                     // rely on the optimization step to fix up the start/end marks...
-                    //                 }
-                    //             }
-                    //             else
-                    //             {
-                    //                 block = new DataStreak(landedInBlock.Block.End, stretchesToBlock.Block.End, 0) { Data = stretchesToBlock.Block.Data };
-                    //                 var replacement = new LinkedBlock(block);
-                    //                 if (numWords > 0)
-                    //                 {
-                    //                     if (numWords >= block.Data.Count)
-                    //                     {
-                    //                         block.Data.Clear();
-                    //                     }
-                    //                     else
-                    //                     {
-                    //                         block.Data.RemoveRange(0,numWords);
-                    //                     }
-                    //                 }
-                    //                 ReplaceBlock(stretchesToBlock, replacement);
-                    //             }
-                    //         }
-                    //     }
-                    // }
                 }
                 else
                 {
@@ -1004,6 +851,29 @@ namespace HP9825CPU
             _CachedLastBlock[0] = null;
             _CachedLastBlock[1] = null;
             DumpTrackDebug(_Tracks[recordOnHead]);
+        }
+
+
+
+        public bool InUse { get => InDrive != null || _Lockedout; }
+
+        private bool _Lockedout = false;
+
+        internal void Lock()
+        {
+            lock(this)
+            {
+                if (InUse)
+                    throw new InvalidOperationException("Cannot lock a tape cartridge when it is already in use.");
+                _Lockedout = true;
+            }
+        }
+        internal void Unlock()
+        {
+            lock(this)
+            {
+                _Lockedout = false;
+            }
         }
 
         private void InsertAfter(LinkedBlock landedInBlock, LinkedBlock newBlock)
@@ -1331,28 +1201,56 @@ namespace HP9825CPU
             }
         }
 
-        private class FileEntry
+        internal bool IsEmpty(int trk)
         {
-            public int Index { get; internal set; }
-            public int FileSize { get; internal set; }
-            public int UsedSize { get; internal set; }
-            public int Type { get; internal set; }
-            public int Generation { get; internal set; }
-            public int Checksum { get; internal set; }
-
-            public FileType TranslatedType { get => Type >= 0 && Type <= 6 ? (FileType)Type : FileType.Unknown; }
+            var t = _Tracks[trk];
+            if (t == null || t.Block == null)
+                return true;
+            return false;
         }
-    }
 
-    public enum FileType
-    {
-        Null = 0,
-        BinaryProgram = 1,
-        NumericData = 2,
-        StringOrMixed = 3,
-        MemoryFile= 4,
-        KeyFile = 5,
-        UserProgram = 6,
-        Unknown = 7
+        internal FileContent? ReadFile(int track, int fileIndex)
+        {
+            var t = _Tracks[track];
+            if (t == null || t.Block == null)
+                return null;
+             LinkedBlock? fileAt = FindFileByIndex(t, fileIndex);
+            if (fileAt == null)
+                return null;
+                            // FileSize = x.Block.Data[2] * 2,
+                            // UsedSize = x.Block.Data[3] * 2,
+            int type = fileAt.Block.Data[4];
+            int fileSize = fileAt.Block.Data[2] * 2;
+            int size = fileAt.Block.Data[3] * 2;
+            int generation = fileAt.Block.Data[5];
+            int extendedFlag2 = fileAt.Block.Data[7];
+
+            FileContent fileContent;
+            switch(type)
+            {
+                case 5:
+                    fileContent = new KeyFileContent(track, fileIndex, fileSize, generation);
+                    break;
+                case 6:
+                    fileContent = new ProgramFileContent(track, fileIndex, fileSize, generation);
+                    break;
+                case 2:
+                    fileContent = new NumericFileContent(track, fileIndex, fileSize, generation);
+                    break;
+                case 3:
+                    fileContent = new MixedFileContent(track, fileIndex, fileSize, generation);
+                    break;
+                case 4:
+                    fileContent = new MemoryFile(track, fileIndex, fileSize, generation, extendedFlag2);
+                    break;
+                case 1:
+                    fileContent = new BinaryProgramFile(track, fileIndex, fileSize, generation);
+                    break;
+                default:
+                    return null;
+            }
+            fileContent.ReadFrom(new StreamInterpreter(fileAt));
+            return fileContent;
+        }
     }
 }

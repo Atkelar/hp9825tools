@@ -1,4 +1,5 @@
 using System;
+using System.Xml;
 
 namespace HP9825CPU
 {

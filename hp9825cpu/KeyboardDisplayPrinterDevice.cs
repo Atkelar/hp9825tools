@@ -5,6 +5,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Runtime.InteropServices.Marshalling;
 using System.Text;
+using System.Xml;
 using HP9825CPU;
 
 namespace HP9825CPU
@@ -16,22 +17,13 @@ namespace HP9825CPU
         : DeviceBase
     {
 
-        // charset is an approximation to keep within the BMP of unicode.
-        // Known "issues": 2 = X with a bar, 3 = N with a bar, 6 = n with a bar.
-        // assumed: N is actually ň and Ň, for X - no plausible alternative found, 
-        // using CHI instead
-        private const string Charset =
-            @"◀¿χŇαϑΓňΔσ↓λμ←τΦ" +   // 0-15
-            @"ΘΩδÅåÄäÖöÜüӔӕ²£▒" +    // 16-31
-            @" !""#$%&'()*+,-./" +   // 32-47 
-            @"0123456789:;<=>?" +    // 48-63
-            @"@ABCDEFGHIJKLMNO" +    // 64-79
-            @"PQRSTUVWXYZ[√]↑_" +    // 80-95
-            @"`abcdefghijklmno" +    // 96-111
-            @"pqrstuvwxyzπ|→ΣͰ";    // 112-127
 
         private bool _HotReset;
 
+        /// <summary>
+        /// Creates a new KDP device.
+        /// </summary>
+        /// <param name="use32CharDisplay">True to use 32 character display, false for 16 chars.</param>
         public KeyboardDisplayPrinterDevice(bool use32CharDisplay = true)
             : base(0, "KDP", null)
         {
@@ -46,6 +38,25 @@ namespace HP9825CPU
             _LastKeyWasPressed = TimeSpan.Zero;
             _CursorTick = false;
             _PrinterBuffer = new char[16];
+        }
+
+        protected override void SaveCurrentState(XmlElement n)
+        {
+            n.SetAttribute("displayBuffer", new string(_DisplayBuffer));
+            n.SetAttribute("printBuffer", new string(_PrinterBuffer));
+            n.SetAttribute("dispLen", _DisplayLength);
+            n.SetAttribute("prtOfs", _CurrentPrinterOffset);
+            n.SetAttribute("beep", this._BeepScheduled);
+            n.SetAttribute("run", this._RunLight);
+            n.SetAttribute("caps", this._ShiftLock);
+            n.SetAttribute("dispOfs", this._CurrentOffset);
+            n.SetAttribute("insert", this._InsertCursor);
+            n.SetAttribute("prtBusy", PrinterBusy);
+            n.SetAttribute("LastPrintedLine", LastPrintedLine);
+            n.SetAttribute("cursorTick", _LastCursorTick);
+            n.SetAttribute("prtDone", _PrinterDone);
+            n.SetAttribute("paperOut", PaperOut);
+            // TODO: validate!
         }
 
         public string Display => _CursorTick && _AnyCursorVisible ? _CurrentCursorDisplay : _CurrentDispay;
@@ -105,7 +116,7 @@ namespace HP9825CPU
                         flag |= 1;
                     if (PaperOut)       // TODO: check if inverted!
                         flag |= 2;
-                    if (PrinterBusy)       // TODO: check if inverted!
+                    if (PrinterBusy)
                         flag |= 4;
                     return flag;
             }
@@ -321,11 +332,11 @@ namespace HP9825CPU
 
             for (int i = co; i < _PrinterBuffer.Length; i++)
             {
-                sb.Append(Charset[_PrinterBuffer[i] & 0x7F]);
+                sb.Append(HP9825Charset.FromHP9825((byte)(_PrinterBuffer[i] & 0x7F)));
             }
             for (int i = 0; i < co; i++)
             {
-                sb.Append(Charset[_PrinterBuffer[i] & 0x7F]);
+                sb.Append(HP9825Charset.FromHP9825((byte)(_PrinterBuffer[i] & 0x7F)));
             }
             LastPrintedLine = sb.ToString();
         }
@@ -342,12 +353,12 @@ namespace HP9825CPU
 
             for (int i = co; i < _DisplayBuffer.Length; i++)
             {
-                sb.Append(Charset[_DisplayBuffer[i] & 0x7F]);
+                sb.Append(HP9825Charset.FromHP9825((byte)(_DisplayBuffer[i] & 0x7F)));
                 _IsCursor[index++] = (_DisplayBuffer[i] & 0x80) != 0;
             }
             for (int i = 0; i < co; i++)
             {
-                sb.Append(Charset[_DisplayBuffer[i] & 0x7F]);
+                sb.Append(HP9825Charset.FromHP9825((byte)(_DisplayBuffer[i] & 0x7F)));
                 _IsCursor[index++] = (_DisplayBuffer[i] & 0x80) != 0;
             }
             _AnyCursorVisible = _IsCursor.Contains(true);

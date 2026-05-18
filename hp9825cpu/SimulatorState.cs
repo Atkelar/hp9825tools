@@ -25,5 +25,9 @@ namespace HP9825CPU
         /// Whenever the simulator ended up in a state that is not valid; the normal CPU would continue to run in circles probably, but the simulator aborts. Unknown opcodes trigger this one.
         /// </summary>
         FailedState = 4,
+        /// <summary>
+        /// The simulator is paused.
+        /// </summary>
+        Paused = 5,
     }
 }

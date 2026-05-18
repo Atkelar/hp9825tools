@@ -57,7 +57,7 @@ namespace hp9825tools.tests
             return Convert.ToInt32(n.ToString(), 8);
         }
 
-        // Something is off wiht this test; re-enable once the WBC/PBC addressing in this case is better understood.
+        // Something is off with this test; re-enable once the WBC/PBC addressing in this case is better understood.
         // Test skipped as a fix, cause the simulator firmware DOES work in this case, so it's save to assume the 
         // implementation is correct, and the test is failing due to a later fix.
         // [Test]

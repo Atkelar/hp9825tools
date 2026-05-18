@@ -111,7 +111,7 @@ namespace HP9825Assembler
                                 cl.IsFromMacro = true;
                             firstRep = false;
                             lines.Add(cl);
-                            repCount = repCount.Value > 1 ? repCount - 1 : null;  // done wiht the next one...
+                            repCount = repCount.Value > 1 ? repCount - 1 : null;  // done with the next one...
                         }
                         else
                         {

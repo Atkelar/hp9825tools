@@ -243,7 +243,7 @@ namespace CommandLineUtils
                         cmd = cmd.ToLowerInvariant();
                     if (cmd == "help")  // predefined...
                     {
-                        if (Output == null)
+                        if (Output == ProcessBase.NullOutput)
                         {
                             var x = new ConsoleBasedOutput();
                             x.Prepare(VerbosityLevel.Normal);
@@ -279,7 +279,7 @@ namespace CommandLineUtils
                         if (await thisCommand.Parse(newArgs) != null)
                             throw ReturnCode.ParseError.Happened($"Command '{cmd}' requsted help. Use global help command instead!");
                         
-                        EnsureOutput();
+                        EnsureOutput(thisCommand.Verbosity);
 
                         thisCommand.ChangeOutput(Output!);
                         if (BannerMessage != null)
@@ -293,24 +293,24 @@ namespace CommandLineUtils
             catch (ReturnCodeException ex)
             {
                 EnsureOutput();
-                Output?.WriteLine(ex.IsNonError ?  VerbosityLevel.Normal : VerbosityLevel.Errors, SplitMode.Word, ex.Message);
+                Output?.WriteLine(ex.IsNonError ?  VerbosityLevel.Normal : VerbosityLevel.Error, SplitMode.Word, ex.Message);
                 return ex.Code;
             }
             catch(Exception ex)
             {
                 EnsureOutput();
-                Output?.WriteLine(VerbosityLevel.Errors, SplitMode.Word, ReturnCode.UhandledError.ErrorMessageTemplate, ex.Message);
+                Output?.WriteLine(VerbosityLevel.Error, SplitMode.Word, ReturnCode.UhandledError.ErrorMessageTemplate, ex.Message);
                 return ReturnCode.UhandledError.Code;
             }
             return ReturnCode.Success.Code; 
         }
 
-        private void EnsureOutput()
+        private void EnsureOutput(VerbosityLevel? level = null)
         {
-            if (Output == ProcessBase.NullOutput)
+            if (Output == ProcessBase.NullOutput || level.HasValue && Output.Verbosity != level.Value)
             {
                 var x = new ConsoleBasedOutput();
-                x.Prepare(VerbosityLevel.Normal);
+                x.Prepare(level ?? VerbosityLevel.Normal);
                 this.OutputTo(x);
             }
         }

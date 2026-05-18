@@ -127,14 +127,14 @@ namespace HP9825CPU
         /// Equality comparison.
         /// </summary>
         /// <param name="a">Value to compare.</param>
-        /// <param name="b">Value to compare wiht.</param>
+        /// <param name="b">Value to compare with.</param>
         /// <returns>True if the two numbers are equal, false if not.</returns>
         public static bool operator == (FloatingPointNumber a, FloatingPointNumber b) => (a.M & ~MInvalidMask) == (b.M & ~MInvalidMask) && a.M1 == b.M1 && a.M2 == b.M2 && a.M3 == b.M3;
         /// <summary>
         /// Equality comparison.
         /// </summary>
         /// <param name="a">Value to compare.</param>
-        /// <param name="b">Value to compare wiht.</param>
+        /// <param name="b">Value to compare with.</param>
         /// <returns>True if the two numbers are equal, false if not.</returns>
         public static bool operator != (FloatingPointNumber a, FloatingPointNumber b) => (a.M & ~MInvalidMask) != (b.M & ~MInvalidMask) || a.M1 != b.M1 || a.M2 != b.M2 || a.M3 != b.M3;
 

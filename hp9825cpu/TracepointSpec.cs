@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Xml;
 
 namespace HP9825CPU
 {
@@ -35,6 +36,17 @@ namespace HP9825CPU
 
         protected TracepointSpec(string name, string label, TraceCategory category  = TraceCategory.Normal)
         {
+            switch(category)
+            {
+                case TraceCategory.Normal:
+                case TraceCategory.Performace:
+                case TraceCategory.Warning:
+                case TraceCategory.Diagnostics:
+                case TraceCategory.Error:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(category), category, "Trace points must be defined in exactly ONE category!");
+            }
             _Count = 0;
             _Name = name;
             _Label = label;
@@ -176,6 +188,13 @@ namespace HP9825CPU
             else
                 who.LogDebugMessage(_Category, "{0}: {1} {2}",_Name, LogLinePrefix(), message);
             _LastTriggered = now;
+        }
+
+        protected internal void SaveState(XmlElement te)
+        {
+            te.SetAttribute("enabled", IsEnabled ? "true" : "false");
+            te.SetAttribute("count", Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            te.SetAttribute("last", _LastTriggered.HasValue ? _LastTriggered.Value.TotalMicroseconds.ToString() : "-");
         }
 
         private TimeSpan? _LastTriggered;

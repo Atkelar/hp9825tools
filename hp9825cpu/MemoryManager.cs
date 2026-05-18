@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Xml;
 using Microsoft.VisualBasic;
 
 namespace HP9825CPU
@@ -132,8 +133,10 @@ namespace HP9825CPU
                     address = 0x4000;
                     break;
                 case OptionRom.Matrix:
-                case OptionRom.SystemProgramming:
                     address = 0x3C00;
+                    break;
+                case OptionRom.SystemProgramming:
+                    address = 0x5000;
                     break;
                 case OptionRom.Plotter:
                     address = 0x3800;
@@ -203,6 +206,59 @@ namespace HP9825CPU
                     throw new NotImplementedException();
             }
             SetRam(new MemoryRange(baseAddress, 0x7FFF));
+        }
+
+        internal void SaveState(XmlElement target)
+        {
+            // strategy: save memory ranges by category.
+            MemoryType type = MemoryType.Missing;
+            int lastBaseAddress = -1;
+            List<byte> bytes = new List<byte>();
+            for(int i = 0; i< BackingMemory.Length; i++)
+            {
+                if (_Mapping[i] != type)
+                {
+                    // close off current streak, if not missing...
+                    if (type != MemoryType.Missing && bytes.Count > 0)
+                    {
+                        var range = target.OwnerDocument.CreateElement(type == MemoryType.Ram ? "ram" : "rom", CpuSimulator.StateSaveNamespace);
+                        target.AppendChild(range);
+                        range.SetAttribute("offset", lastBaseAddress.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                        range.SetAttribute("length", bytes.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                        range.InnerText = Convert.ToBase64String(bytes.ToArray());
+                        bytes.Clear();
+                    }
+                    lastBaseAddress = i;
+                    type = _Mapping[i];
+                }
+                if (type != MemoryType.Missing)
+                {
+                    var b = BackingMemory[i];
+                    bytes.Add((byte)(b & 0xFF));
+                    bytes.Add((byte)((b >> 8) & 0xFF));
+                }
+            }
+            // last block...
+            if (type != MemoryType.Missing && bytes.Count > 0)
+            {
+                var range = target.OwnerDocument.CreateElement(type == MemoryType.Ram ? "ram" : "rom", CpuSimulator.StateSaveNamespace);
+                target.AppendChild(range);
+                range.SetAttribute("offset", lastBaseAddress.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                range.SetAttribute("length", bytes.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                range.InnerText = Convert.ToBase64String(bytes.ToArray());
+            }
+
+            if (_Faults != null)
+            {
+                var fElement = target.OwnerDocument.CreateElement("faults", CpuSimulator.StateSaveNamespace);
+                target.AppendChild(fElement);
+                foreach(var fault in _Faults)
+                {
+                    var fInfo = target.OwnerDocument.CreateElement("fault", CpuSimulator.StateSaveNamespace);
+                    fElement.AppendChild(fInfo);
+                    fault.SaveState(fInfo);
+                }
+            }
         }
 
         /// <summary>

@@ -19,6 +19,8 @@ namespace HP9825Utils
             public bool Negate { get; set; }
             [Argument("u16", "Use16Bit", HelpText = "When specified, assume 16-bit addressing mode. Extends the valid ragnes of offsets.")]
             public bool Use16Bit { get; set; }
+            [Argument("fcount", "FillCount", HelpText = "When specified, set the content of the image to incrementing words. Otherwise, zero is used to fill.")]
+            public bool FillCounter { get; set; }
         }
 
 
@@ -39,10 +41,17 @@ namespace HP9825Utils
             if (string.IsNullOrWhiteSpace(Output!.Filename)) // TODO: build some overide capability for mandatory/positional settings! Syntax and parsing updates would be nice...
                 throw ReturnCode.ParseError.Happened("Filename", "Ouptut file name is missing!");
             Memory mem = Memory.MakeMemory(Local!.Use16Bit, allowArbitraryLength: true);
+            if (Local.FillCounter)
+            {
+                for(int i =0;i<mem.Length;i++)
+                {
+                    mem[i] = (i & 0xFFFF);
+                }
+            }
             if (Local!.Negate)
             {
                 for(int i = 0; i < mem.Length; i++)
-                    mem[i] = 0xFFFF;
+                    mem[i] = (mem[i] ^ 0xFFFF) & 0xFFFF;
             }
 
             await Output.WriteNow(mem, null, 0, mem.Length);

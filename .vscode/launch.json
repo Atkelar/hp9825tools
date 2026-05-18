@@ -33,7 +33,9 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/bin/Debug/hp9825utils.dll",
-            "args": ["mi", "private/RAMChecker-2-out.bin", "private/RAMChecker-2.bin", "-hl", "-in:hl", "--reverse", "--negate", "--targetoffset", "0", "--targetsize", "16384" ],
+            
+            "args": ["texp", "./private/test.tape", "-s", "2", "-e", "2"],
+            //"args": ["mi", "private/RAMChecker-2-out.bin", "private/RAMChecker-2.bin", "-hl", "-in:hl", "--reverse", "--negate", "--targetoffset", "0", "--targetsize", "16384" ],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
             "stopAtEntry": false

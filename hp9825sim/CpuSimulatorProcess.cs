@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Reflection.Metadata;
 using System.Threading.Tasks;
 using System.Transactions;
@@ -60,7 +61,7 @@ namespace HP9825Simulator
                             this.QueueCommand(PrinterOutput.ExportToHtmlCommand, "private/test-prt.html");
                             return true;
                         case SaveCurrentTapeCommand:
-                            this.QueueCommand(TapeStatus.SaveTapeCommand, "private/test.tape");
+                            this.QueueCommand(TapeStatus.SaveTapeCommand, "private/test2.tape");
                             return true;
                     }
                     break;
@@ -179,15 +180,20 @@ namespace HP9825Simulator
             {
                 item.IsEnabled = false;
             }
+            tape.Tracepoints.First(x=>x.Name=="GAPNOW").IsEnabled=true;
+            tape.Tracepoints.First(x=>x.Name=="GAPNOT").IsEnabled=true;
+            tape.Tracepoints.First(x=>x.Name=="CMDCHG").IsEnabled=true;
 
             // tape.InsertCartridge(TapeCartridge.Create("Testing2"));
             // TestTapeDrive1(kdp);
-            tape.InsertCartridge(await TapeCartridge.Load("private/test.tape"));
-            TestTapeDriveList(kdp);
+            tape.InsertCartridge(await TapeCartridge.Load("private/test2.tape"));
+            //TestTapeDriveList(kdp);
             //TestTapeDrive2(kdp);
             //TestTapeDrive3(kdp);
             //TestTapeDrive4(kdp);
             //TestTapeDrive5(kdp);
+            //TestTapeDrive6(kdp);
+            TestTapeDrive7(kdp);
 
             // TestMandelbrot(kdp, false);
             // kdp.PutKeyPresses("list", TimeSpan.FromSeconds(1));
@@ -333,6 +339,49 @@ namespace HP9825Simulator
             kdp.PutKeyPress(HP9825Key.Execute, false);
         }
 
+        private void TestTapeDrive7(KeyboardDisplayPrinterDevice kdp)
+        {
+            kdp.PutKeyPresses("trk 1", TimeSpan.FromSeconds(1));
+            kdp.PutKeyPress(HP9825Key.Execute, false, TimeSpan.FromSeconds(1));
+            kdp.PutKeyPress(HP9825Key.Rewind, false, TimeSpan.FromSeconds(1));
+            kdp.PutKeyPresses("fdf 20", TimeSpan.FromSeconds(5));
+            kdp.PutKeyPress(HP9825Key.Execute, false, TimeSpan.FromSeconds(1));
+            kdp.PutKeyPresses("mrk 1,32000", TimeSpan.FromSeconds(10));
+            kdp.PutKeyPress(HP9825Key.Execute, false, TimeSpan.FromSeconds(1));
+            kdp.PutKeyPresses("rcm 20", TimeSpan.FromSeconds(20));
+            kdp.PutKeyPress(HP9825Key.Execute, false, TimeSpan.FromSeconds(1));
+        }
+
+        private void TestTapeDrive6(KeyboardDisplayPrinterDevice kdp)
+        {
+            kdp.PutKeyPress(HP9825Key.Rewind, false, TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Fetch, false, TimeSpan.FromSeconds(3));
+            kdp.PutKeyPress(HP9825Key.Function0, false);
+            kdp.PutKeyPresses("prt");
+            kdp.PutKeyPress(HP9825Key.Store, false);
+            kdp.PutKeyPress(HP9825Key.Fetch, false, TimeSpan.FromSeconds(1));
+            kdp.PutKeyPress(HP9825Key.Function1, false);
+            kdp.PutKeyPresses("*prt \"π\",π");
+            kdp.PutKeyPress(HP9825Key.Store, false);
+            kdp.PutKeyPress(HP9825Key.Fetch, false, TimeSpan.FromSeconds(1));
+            kdp.PutKeyPress(HP9825Key.Function2, false);
+            kdp.PutKeyPresses("/2.71828182846");
+            kdp.PutKeyPress(HP9825Key.Store, false);
+            kdp.PutKeyPress(HP9825Key.Fetch, false, TimeSpan.FromSeconds(1));
+            kdp.PutKeyPress(HP9825Key.Function3, false);
+            kdp.PutKeyPresses("*→R;dspR,\"in.=\",2.54R,\"cm.\"");
+            kdp.PutKeyPress(HP9825Key.Store, false);
+            kdp.PutKeyPresses("list k");
+            kdp.PutKeyPress(HP9825Key.Execute, false, TimeSpan.FromSeconds(5));
+            kdp.PutKeyPresses("trk 1", TimeSpan.FromSeconds(5));
+            kdp.PutKeyPress(HP9825Key.Execute, false);
+            kdp.PutKeyPress(HP9825Key.Rewind, false);
+            kdp.PutKeyPresses("mrk 20,1024", TimeSpan.FromSeconds(5));
+            kdp.PutKeyPress(HP9825Key.Execute, false);
+            kdp.PutKeyPresses("rck 1", TimeSpan.FromSeconds(20));
+            kdp.PutKeyPress(HP9825Key.Execute, false);
+        }
+
         private void TestTapeDrive4(KeyboardDisplayPrinterDevice kdp)
         {
             kdp.PutKeyPress(HP9825Key.Rewind, false, TimeSpan.FromSeconds(2));
@@ -458,7 +507,7 @@ namespace HP9825Simulator
 
         private void TestFunctionKeys(KeyboardDisplayPrinterDevice kdp)
         {
-            kdp.PutKeyPress(HP9825Key.LineFetch, false, TimeSpan.FromSeconds(2));
+            kdp.PutKeyPress(HP9825Key.Fetch, false, TimeSpan.FromSeconds(2));
             kdp.PutKeyPress(HP9825Key.Function0);
             kdp.PutKeyPresses("*→R; dspR,\"in.=\",2.54R,\"cm.\"");
             kdp.PutKeyPress(HP9825Key.Store);

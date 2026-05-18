@@ -108,6 +108,10 @@ namespace HP9825CPU
             return new AssemblyEndLine(from, comment);
         }
 
+        internal static AssemblyLine FromDef(SourceLineRef from, int address, int value, string expression, bool isIndirect, string? label, string? comment)
+        {
+            return new AssemblyDefLine(from, address, null, expression, isIndirect, label, comment, value);
+        }
         internal static AssemblyLine FromDef(SourceLineRef from, int address, Assembler.ExpressionBase? fixupFrom, string expression, bool isIndirect, string? label, string? comment)
         {
             return new AssemblyDefLine(from, address, fixupFrom, expression, isIndirect, label, comment);
@@ -455,10 +459,11 @@ namespace HP9825CPU
         private class AssemblyDefLine
                 : AssemblyLine
         {
-            public AssemblyDefLine(SourceLineRef from, int address, Assembler.ExpressionBase? fixupFrom, string expression, bool isIndirect, string? label, string? comment)
+            public AssemblyDefLine(SourceLineRef from, 
+                int address, Assembler.ExpressionBase? fixupFrom, string expression, bool isIndirect, string? label, string? comment, int? value = null)
                 : base(from, address, comment, label)
             {
-                Value = fixupFrom?.Compute();   // try here...
+                Value = value ?? fixupFrom?.Compute();   // try here...
                 if (!Value.HasValue)
                     FixupFrom = fixupFrom;  // try again later...
                 IsIndirect = isIndirect;
@@ -485,7 +490,7 @@ namespace HP9825CPU
             }
             public override void CreateOutput(ListingPrinter target)
             {
-                target.PrintSourceLine(Address, Value, Label, "DEF", Expression + (IsIndirect ? ",I" : ""), Comment, false, IsFromMacro);
+                target.PrintSourceLine(Address, this.Value, Label, "DEF", Expression + (IsIndirect ? ",I" : ""), Comment, false, IsFromMacro);
             }
 
             public override string Beautified()

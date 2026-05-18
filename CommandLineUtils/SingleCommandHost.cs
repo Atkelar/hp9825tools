@@ -208,7 +208,7 @@ namespace CommandLineUtils
             return 0;
         }
 
-        private VerbosityLevel RequestedVerbosity = VerbosityLevel.Normal; 
+        //private VerbosityLevel RequestedVerbosity = VerbosityLevel.Normal; 
 
         /// <summary>
         /// Runs the application; will be based on the command to run; parses command line arguments, prints startup banner and delegates execution to command object.
@@ -227,7 +227,7 @@ namespace CommandLineUtils
                 cmd.Prepare(true);
 
                 string? helpPage = await cmd.Parse(args);
-                cmd.ChangeOutput(EnsureOutput());
+                cmd.ChangeOutput(EnsureOutput(cmd.Verbosity));
                 if (BannerMessage != null)
                 {
                     Output.WriteLine(VerbosityLevel.Normal, BannerMessage);
@@ -241,13 +241,13 @@ namespace CommandLineUtils
             }
             catch (ReturnCodeException ex)
             {
-                EnsureOutput();
-                Output.WriteLine(ex.IsNonError ? VerbosityLevel.Normal : VerbosityLevel.Errors, ex.Message);
+                EnsureOutput(VerbosityLevel.Normal);
+                Output.WriteLine(ex.IsNonError ? VerbosityLevel.Normal : VerbosityLevel.Error, ex.Message);
                 return ex.Code;
             }
             catch(Exception ex)
             {
-                EnsureOutput();
+                EnsureOutput(VerbosityLevel.Normal);
                 Output.WriteLine(ReturnCode.UhandledError.ErrorMessageTemplate, ex.Message);
                 
 #if DEBUG
@@ -258,12 +258,12 @@ namespace CommandLineUtils
             return ReturnCode.Success.Code; 
         }
 
-        private OutputHandlerBase EnsureOutput()
+        private OutputHandlerBase EnsureOutput(VerbosityLevel level)
         {
             if (Output == ProcessBase.NullOutput)
             {
                 var x = new ConsoleBasedOutput();
-                x.Prepare(VerbosityLevel.Normal);
+                x.Prepare(level);
                 this.OutputTo(x);
             }
             return Output;

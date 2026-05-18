@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Threading.Tasks;
+using System.Xml;
 
 namespace HP9825CPU
 {
@@ -76,6 +79,7 @@ namespace HP9825CPU
         /// </summary>
         protected internal virtual void Reset()
         {
+            _DMAR = false;
             TracePoint("RESET");
         }
 
@@ -133,6 +137,23 @@ namespace HP9825CPU
                 Debug.WriteLine("Unconnected device {0} ({1}) reproted hardware controlling issue: {2}", this.Name, this.Type, message);
         }
 
+        private bool _DMAR;
+
+        /// <summary>
+        /// Sets or clears the device's DMAR line. There is no specific rule as to when or how this is handled by the CPU, so... brace yourself! If the requested value is unchanged, nothing will happen.
+        /// </summary>
+        public bool DMAR
+        {
+            get => _DMAR;
+            set
+            {
+                if (value != _DMAR)
+                {
+                    // trace/notify..
+                }
+                _DMAR = value;
+            }
+        }
 
         /// <summary>
         /// Pushes the buttons for an interrupt request. Note that this is a multi-step process that may also fail... Should be called during any "Tick" code and will trigger the interrupt handling on the next tick, as per spec.
@@ -174,6 +195,27 @@ namespace HP9825CPU
         protected internal virtual void InterruptConfirmed()
         {
         }
+
+        internal void SaveState(XmlElement n)
+        {
+            var nDev = n.OwnerDocument.CreateElement("device", CpuSimulator.StateSaveNamespace);
+            n.AppendChild(nDev);
+            SaveCurrentState(nDev);
+            if (_TracePoints.Count > 0)
+            {
+                var nTrace = n.OwnerDocument.CreateElement("traces", CpuSimulator.StateSaveNamespace);
+                n.AppendChild(nTrace);
+                foreach(var t in _TracePoints)
+                {
+                    var te = n.OwnerDocument.CreateElement("tp", CpuSimulator.StateSaveNamespace);
+                    nTrace.AppendChild(te);
+                    te.SetAttribute("id", t.Key);
+                    t.Value.SaveState(te);
+                }
+            }
+        }
+
+        protected abstract void SaveCurrentState(XmlElement target);
 
         private class DeviceTracepointBuilder
             : ITracePointBuilder

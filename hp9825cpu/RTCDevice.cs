@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Channels;
+using System.Xml;
 
 namespace HP9825CPU
 {
@@ -33,7 +34,7 @@ namespace HP9825CPU
             Status = true;  // always set (decoding logic is done by the device manager for convenience.)
             for(int i=0;i<4;i++)
             {
-                Units[i]._Parent = this;
+                _Units[i]._Parent = this;
                 if (!hasCable)
                 {
                     _Inputs[i] = true;
@@ -86,6 +87,62 @@ namespace HP9825CPU
             SetDefaults();
         }
 
+        protected override void SaveCurrentState(XmlElement target)
+        {
+            target.SetAttribute("lastTick", _LastTimingTick);
+            if (_CommandInputBuffer.Length>0)
+                target.SetAttribute("cmdBuf", _CommandInputBuffer.ToString());
+            target.SetAttribute("baseTicks", _BaseTicksForEvents);
+            target.SetAttribute("errorCode", _ErrorCode);
+            target.SetAttribute("euroDate", _EuropeanDateFormat);
+            target.SetAttribute("extended", _ExtendedFormat);
+            target.SetAttribute("hasCable", _HasCable);
+            target.SetAttribute("hasInput", _HasInputData);
+            target.SetAttribute("hasIO", _HasIOPending);
+            for(int i=0;i<_Inputs.Length;i++)
+                target.SetAttribute("in" + i.ToString(), _Inputs[i]);
+            target.SetAttribute("irqFlag", _InterruptFlag);
+            target.SetAttribute("irqState", _InterruptStatus);
+            target.SetAttribute("latchIn", _LatchInput);
+            target.SetAttribute("latchOut", _LatchOutput);
+            target.SetAttribute("nextCommand", _NextCommand);
+            target.SetAttribute("offsetRT", _OffsetToRealTime);
+            target.SetAttribute("outIndex", _OutIndex);
+            if (_OutputBuffer != null)
+            {
+                target.SetAttribute("outBufferLen", _OutputBuffer.Length);
+                target.SetAttribute("outBuffer", Convert.ToBase64String(_OutputBuffer));
+            }
+            target.SetAttribute("outLength", _OutputLength);
+            target.SetAttribute("resetTime", _ResetTime);
+            target.SetAttribute("runRelative", _RunRelative);
+            target.SetAttribute("hwError", _ScheduledHardwareErorr);
+            target.SetAttribute("startTime", _StartupAt);
+            for(int i=0;i<4;i++)
+            {
+                var eUnit = target.OwnerDocument.CreateElement("unit", CpuSimulator.StateSaveNamespace);
+                target.AppendChild(eUnit);
+                eUnit.SetAttribute("idx", i);
+                eUnit.SetAttribute("port", _Units[i].ExternalPort);
+                eUnit.SetAttribute("delay", _Units[i].Delay );
+                eUnit.SetAttribute("period", _Units[i].Period );
+                eUnit.SetAttribute("running", _Units[i].Running );
+                eUnit.SetAttribute("value", _Units[i].Value );
+                eUnit.SetAttribute("mDay", _Units[i].MatchDay);
+                eUnit.SetAttribute("mHour", _Units[i].MatchHour );
+                eUnit.SetAttribute("mMin", _Units[i].MatchMinute );
+                eUnit.SetAttribute("mSec", _Units[i].MatchSecond );
+            }
+            target.SetAttribute("simulatedReset", this.ForcedTimeAtReset);
+            target.SetAttribute("waitingLineMask", this.WaitingForLineMask);
+            target.SetAttribute("unservicedIrqs", this.UnservicedInterrupts);
+            target.SetAttribute("triggerCode", this.TriggerCode);
+            target.SetAttribute("testPointOn", this.TestPointEnabled);
+            target.SetAttribute("simulationRelative", this.SimulationRelativeTiming);
+            target.SetAttribute("simulateRTCError", this.RTCError);
+            // TODO: validate!
+        }
+
         /// <summary>
         /// Gets the "simulated time" based on settings. 
         /// </summary>
@@ -112,12 +169,12 @@ namespace HP9825CPU
             _InterruptStatus = false;
             for(int i =0;i<4;i++)
             {
-                Units[i].Reset();
+                _Units[i].Reset();
             }
-            Units[0].Mode = TiminigUnitMode.Output;
-            Units[0].ExternalPort = 0;
-            Units[1].Mode = TiminigUnitMode.Input;
-            Units[1].ExternalPort = 1;
+            _Units[0].Mode = TiminigUnitMode.Output;
+            _Units[0].ExternalPort = 0;
+            _Units[1].Mode = TiminigUnitMode.Input;
+            _Units[1].ExternalPort = 1;
             _BaseTicksForEvents = RelativeTime.Ticks;
             _LastTimingTick = 0;
             OutputLineMask = 0;
@@ -291,9 +348,9 @@ namespace HP9825CPU
                 int triggerWord = 0;
                 for(int i =0;i<4;i++)
                 {
-                    if  (Units[i].Tick(delta))
+                    if  (_Units[i].Tick(delta))
                     {
-                        triggerWord |= 1 << Units[i].ExternalPort;
+                        triggerWord |= 1 << _Units[i].ExternalPort;
                     }
                 }
                 _LastTimingTick = delta;
@@ -402,7 +459,7 @@ namespace HP9825CPU
         {
             for(int i=0;i<4;i++)
             {
-                if (Units[i].Mode != TiminigUnitMode.Unassigned)
+                if (_Units[i].Mode != TiminigUnitMode.Unassigned)
                     ActivateUnit(i);
             }
         }
@@ -410,15 +467,15 @@ namespace HP9825CPU
         private void ActivateUnit(int index)
         {
             // TODO: set init params...
-            Units[index].Start();
+            _Units[index].Start();
         }
 
         private void HandleHaltAll()
         {
             for(int i=0;i<4;i++)
             {
-                if (Units[i].Mode != TiminigUnitMode.Unassigned)
-                    Units[i].Stop();
+                if (_Units[i].Mode != TiminigUnitMode.Unassigned)
+                    _Units[i].Stop();
             }
             _InterruptFlag = false;
         }
@@ -669,7 +726,7 @@ namespace HP9825CPU
             }
         }
 
-        private TimingUnit[] Units = new TimingUnit[4];
+        private TimingUnit[] _Units = new TimingUnit[4];
 
         private static int? UnitIndexFromString(string value, int index = 0)
         {
@@ -744,12 +801,12 @@ namespace HP9825CPU
             // period has two versions:
             // P alone: clear delay.
             // P### : n ms period - n = 0 (off) to 99999999 ms.
-            if (Units[unitIndex].Running)
+            if (_Units[unitIndex].Running)
             {
                 SetErrorPortActive();
                 return;
             }
-            if (Units[unitIndex].Mode != TiminigUnitMode.Output)
+            if (_Units[unitIndex].Mode != TiminigUnitMode.Output)
             {
                 SetErrorPortAssignment();
                 return;
@@ -768,7 +825,7 @@ namespace HP9825CPU
                 SetErrorBadInstruction();
                 return;
             }
-            Units[unitIndex].Period = period;
+            _Units[unitIndex].Period = period;
         }
 
         private void HandleDelayCommand(int unitIndex, string command)
@@ -776,12 +833,12 @@ namespace HP9825CPU
             // delay has two versions:
             // D alone: clear delay.
             // D### : n ms delay - n = 0 (off) to 99999999 ms.
-            if (Units[unitIndex].Running)
+            if (_Units[unitIndex].Running)
             {
                 SetErrorPortActive();
                 return;
             }
-            if (Units[unitIndex].Mode != TiminigUnitMode.Output)
+            if (_Units[unitIndex].Mode != TiminigUnitMode.Output)
             {
                 SetErrorPortAssignment();
                 return;
@@ -800,7 +857,7 @@ namespace HP9825CPU
                 SetErrorBadInstruction();
                 return;
             }
-            Units[unitIndex].Delay = delay;
+            _Units[unitIndex].Delay = delay;
         }
 
         private void HandleUnitMatchCommand(int unitIndex, string command)
@@ -808,22 +865,22 @@ namespace HP9825CPU
             // match command can have two versions:
             // M alone: cancel match pattern.
             // M ## : set match to specific "pattern".
-            if (Units[unitIndex].Running)
+            if (_Units[unitIndex].Running)
             {
                 SetErrorPortActive();
                 return;
             }
-            if (Units[unitIndex].Mode != TiminigUnitMode.Output)
+            if (_Units[unitIndex].Mode != TiminigUnitMode.Output)
             {
                 SetErrorPortAssignment();
                 return;
             }
             if (command.Length==0)
             {
-                Units[unitIndex].MatchSecond = null;
-                Units[unitIndex].MatchHour = null;
-                Units[unitIndex].MatchMinute = null;
-                Units[unitIndex].MatchDay = null;
+                _Units[unitIndex].MatchSecond = null;
+                _Units[unitIndex].MatchHour = null;
+                _Units[unitIndex].MatchMinute = null;
+                _Units[unitIndex].MatchDay = null;
             }
             else
             {
@@ -834,57 +891,57 @@ namespace HP9825CPU
                     return;
                 }
                 // we only want seconds upwards..
-                Units[unitIndex].MatchSecond = second;
-                Units[unitIndex].MatchMinute = minute;
-                Units[unitIndex].MatchHour = hour;
-                Units[unitIndex].MatchDay = day;
+                _Units[unitIndex].MatchSecond = second;
+                _Units[unitIndex].MatchMinute = minute;
+                _Units[unitIndex].MatchHour = hour;
+                _Units[unitIndex].MatchDay = day;
                 // ignoring month and year...
             }
         }
 
         private void HandleRequestCounterInUnit(int unitIndex)
         {
-            if (Units[unitIndex].Mode != TiminigUnitMode.Input)
+            if (_Units[unitIndex].Mode != TiminigUnitMode.Input)
                 SetErrorPortAssignment();
             else
-                SetOutputBuffer(Units[unitIndex].GetTimerValue().ToString());
+                SetOutputBuffer(_Units[unitIndex].GetTimerValue().ToString());
         }
 
         private void HandleClearCounterInUnit(int unitIndex)
         {
-            if (Units[unitIndex].Mode != TiminigUnitMode.Input)
+            if (_Units[unitIndex].Mode != TiminigUnitMode.Input)
                 SetErrorPortAssignment();
             else
-                Units[unitIndex].Value = 0;
+                _Units[unitIndex].Value = 0;
         }
 
         private void HandleActivateUnit(int unitIndex)
         {
-            if(Units[unitIndex].Mode == TiminigUnitMode.Unassigned)
+            if(_Units[unitIndex].Mode == TiminigUnitMode.Unassigned)
                 SetErrorPortAssignment();
             else
-                Units[unitIndex].Start();
+                _Units[unitIndex].Start();
         }
 
         private void HandleHaltUnit(int unitIndex)
         {
-            if(Units[unitIndex].Mode == TiminigUnitMode.Unassigned)
+            if(_Units[unitIndex].Mode == TiminigUnitMode.Unassigned)
                 SetErrorPortAssignment();
             else
-                Units[unitIndex].Stop();
+                _Units[unitIndex].Stop();
         }
 
         private void HandleUnitAssignment(int unitIndex, string command)
         {
-            if (Units[unitIndex].Running)   // not allowed.
+            if (_Units[unitIndex].Running)   // not allowed.
             {
                 SetErrorPortActive();
                 return;
             }
             if (command.Length==0)  // got a "U#=" command...
             {
-                Units[unitIndex].Mode = TiminigUnitMode.Unassigned;
-                Units[unitIndex].ExternalPort = -1;
+                _Units[unitIndex].Mode = TiminigUnitMode.Unassigned;
+                _Units[unitIndex].ExternalPort = -1;
                 return;
             }
             if(command.Length<2)
@@ -915,8 +972,8 @@ namespace HP9825CPU
                 return;
             }
 
-            Units[unitIndex].Mode = newMode;
-            Units[unitIndex].ExternalPort = portNumber.Value;
+            _Units[unitIndex].Mode = newMode;
+            _Units[unitIndex].ExternalPort = portNumber.Value;
         }
 
         private string SkipNumbers(string command)

@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -64,10 +65,13 @@ namespace HP9825Utils
             for(int i = 0; i < length; i++)
             {
                 int word = source[x.Offset + i];
+                //Out.Write($"Read {word:x4} from {i} at {x.Offset + i:x4} - ");
                 if (Local.Negate)
                     word = (~word) & 0xFFFF;
                 mem[ti] = word;
+                //Out.WriteLine($"Wrote {word:x4} at {ti:x4}");
                 ti += td;
+                //if (i > 10) break;
             }
 
             await Modify.WriteNow(mem);

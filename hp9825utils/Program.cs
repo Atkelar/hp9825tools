@@ -16,6 +16,10 @@ namespace HP9825Utils
                 host.Register<CreateImageCommand>();
                 host.Register<MergeIntoCommand>();
                 host.Register<TranslateAddressCommand>();
+                host.Register<CreateCartridgeCommand>();
+                host.Register<GetCartridgeListingCommand>();
+                host.Register<CartridgeExportFileCommand>();
+                host.Register<ExtractHPLTables>();
 
                 return await host.Run(args);
             }

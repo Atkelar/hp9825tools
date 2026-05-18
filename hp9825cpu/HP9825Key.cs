@@ -41,7 +41,7 @@ namespace HP9825CPU
         Continue=0x19,
         //=0x1A,
         List=0x1B,
-        LineFetch=0x1C,
+        Fetch=0x1C,
         Erase=0x1D,
         Record=0x1E,
         Load=0x1F,

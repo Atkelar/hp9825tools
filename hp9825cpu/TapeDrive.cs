@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Formats.Tar;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Xml;
 
 namespace HP9825CPU
 {
@@ -199,6 +202,7 @@ namespace HP9825CPU
             _ServoFailed = false;
             _CurrentSpeed = 0;
             _TargetSpeed = 0;
+            _LastStreak = null;
             _LastMode = TapeMode.Idle;
             _SignalInterRecordGap = true;   // assume gap...
             _SignalGap = true;
@@ -206,10 +210,61 @@ namespace HP9825CPU
             Moving = false;
         }
 
+        protected override void SaveCurrentState(XmlElement target)
+        {
+            target.SetAttribute("status", _StatusRegister);
+            target.SetAttribute("command", _CommandRegister);
+            target.SetAttribute("writeLatched", _WriteLatched);
+            target.SetAttribute("writeValue", _BitWriteValueLatch);
+            target.SetAttribute("lastTick", _LastTick);
+            target.SetAttribute("servoFail", _ServoFailed);
+            target.SetAttribute("speed", _CurrentSpeed);
+            target.SetAttribute("targetSpeed", _TargetSpeed);
+            target.SetAttribute("lastMode", _LastMode);
+            target.SetAttribute("signalIRG", _SignalInterRecordGap);
+            target.SetAttribute("lastTacPos", _LastTacSignalPosition);
+            target.SetAttribute("betFlag", _BETFlag);
+            target.SetAttribute("cartOut", _CartridgeOut);
+            target.SetAttribute("cartridge", Cartridge?.Label);
+            target.SetAttribute("cartridgePos", Cartridge?.Position);
+            target.SetAttribute("dmarLatch", _DMARLatch);
+            target.SetAttribute("readTick", _LastReadTick);
+            target.SetAttribute("moving", _Moving);
+            target.SetAttribute("rwPulse", _NextRWPulse);
+            target.SetAttribute("readBitCount", _ReadBitCounter);
+            target.SetAttribute("readBitResult", _ReadBitResult);
+            target.SetAttribute("readWordOffset", _ReadWordOffset);
+            target.SetAttribute("searchDone", _SearchCompleted);
+            target.SetAttribute("head", _SelectedHead);
+            target.SetAttribute("gap", _SignalGap);
+            target.SetAttribute("wasGap", _WasGap);
+            target.SetAttribute("writeBitCount", _WriteBitCount);
+            target.SetAttribute("writeProt", _WriteProtected);
+            target.SetAttribute("writeStarted", _WriteStarted);
+            target.SetAttribute("writeWord", _WriteWord);
+            if (_LastStreak != null)
+            {
+                // we seem to be caught in a write; make sure we recall that...
+                var tStreak = target.OwnerDocument.CreateElement("streak", CpuSimulator.StateSaveNamespace);
+                target.AppendChild(tStreak);
+                tStreak.SetAttribute("start", _LastStreak.Start);
+                tStreak.SetAttribute("end", _LastStreak.End);
+                tStreak.SetAttribute("count", _LastStreak.Data.Count);
+                byte[] buf = new byte[_LastStreak.Data.Count * 2];
+                for(int i=0;i<_LastStreak.Data.Count;i++)
+                {
+                    var w = _LastStreak.Data[i];
+                    buf[i*2] = (byte)(w & 0xFF);
+                    buf[i*2+1] = (byte)((w >> 8) & 0xFF);
+                }
+                tStreak.InnerText = Convert.ToBase64String(buf);
+            }
+        }
+
         /// <summary>
         /// True if the motor is currenty spinning. Takes into account all the "halt" conditions inside the controller.
         /// </summary>
-        private bool MotorOn => (_CommandRegister & CommandFlags.Run)  != 0 && !_CartridgeOut && !_ServoFailed && !_BETFlag;
+        private bool MotorOn => (_CommandRegister & CommandFlags.Run)  != 0 && !_CartridgeOut && !_ServoFailed && !_BETFlag && !_SearchCompleted;
 
         /// <summary>
         /// "SFL" flag - servo failed. This is triggered when an over voltage or over current is detected.
@@ -270,16 +325,23 @@ namespace HP9825CPU
                     _WriteLatched = true;
                     break;
                 case 1: // R5 => Status
+                    bool oldSearch = ((_CommandRegister & CommandFlags.Search)!=0);
                     _CommandRegister = (CommandFlags)(~value & 0xFF);
                     _StatusRegister &= ~StatusFlags.Reverse; 
                     if ((_CommandRegister & CommandFlags.Reverse) != 0) // reverse... is reversed in the schematic...
                         _StatusRegister |= StatusFlags.Reverse;
-                    if ((_CommandRegister & CommandFlags.Search)!=0)
-                        throw new NotImplementedException("Got a search request! DMA time!");
+                    if (oldSearch != ((_CommandRegister & CommandFlags.Search)!=0))
+                    {
+                        // serach changed, if "oldsearch" was true, clear "search complete" flag.
+                        if (oldSearch)
+                            _SearchCompleted = false;
+                    }
+                    //     throw new NotImplementedException("Got a search request! DMA time!");
                     _TPCommandStateChanged.Invoke(_CommandRegister, Cartridge?.Position);
                     break;
                 case 2: // R6 => DMA finished...
-                    _DMARLatch = false; // TODO: actually pull signal form "SCH" here...
+                    _DMARLatch = false;
+                    _SearchCompleted = true;
                     break;
                 case 3: // R7 => clear special status flags...
                     _ServoFailed = false;
@@ -394,6 +456,7 @@ namespace HP9825CPU
             var delta = System.RunTime.Subtract(_LastTick).TotalSeconds;
             var newMode = _LastMode; // keep current mode if we haven't ticked...
             var posNow = Cartridge?.Position ?? 0;
+            var preTickGap = _SignalGap;
             double dirFlag = 0;
             if (delta > 0)
             {
@@ -558,8 +621,8 @@ namespace HP9825CPU
                 }
             }
 
-            if ((_CommandRegister & CommandFlags.Search) != 0)
-                throw new NotImplementedException();    // yikes!
+            // if ((_CommandRegister & CommandFlags.Search) != 0)
+            //     throw new NotImplementedException();    // yikes!
 
             // handle mode change...
             if (newMode != _LastMode)   // mode transition... handle wrap ups...
@@ -600,7 +663,7 @@ namespace HP9825CPU
                         // {
                         //     Debug.WriteLine("Switched from data to gap mode?!");
                         // }
-                        _WriteStarted = posNow; // continue on wiht a gap...
+                        _WriteStarted = posNow; // continue on with a gap...
                         _NextRWPulse = null;// posNow + dirFlag * FirstBitClockAfterInch;
                         break;
                     case TapeMode.ReadingData:
@@ -807,38 +870,10 @@ namespace HP9825CPU
             }
             _LastMode = newMode;
 
-            // if ((_CommandRegister & CommandFlags.Write) != 0 && (_CommandRegister & CommandFlags.Run) != 0)
-            // {
-            //     if (!_WriteStarted.HasValue)
-            //     {
-            //         _WriteStarted = Cartridge?.Position;
-            //     }
-            //     if((_CommandRegister & CommandFlags.ThresholdHiOrGap)==0) // no longer in GAP mode!
-            //     {
-            //         if (_WriteLatched && rwFlag)
-            //         {
-            //             if (this._LastStreak == null)
-            //             {
-            //                 this._LastStreak = new DataStreak() { Start = _WriteStarted.Value };
-            //                 _LastStreak.Gap = (Cartridge?.Position).GetValueOrDefault() - (_WriteStarted.GetValueOrDefault());
-            //             }
-            //             // gotcha
-            //         }
-            //     }
-            //     else
-            //     {
-            //         if (_LastStreak != null) // we are in GAP after data mode...
-            //         {
-            //         // gap mode... is there a block?
-            //             CloseStreak();
-            //             _WriteStarted = Cartridge?.Position;
-            //         }
-            //     }
-            // }
-            // else
-            // {
-            //     CloseStreak();
-            // }
+            if (_SignalGap && !preTickGap && (_CommandRegister & CommandFlags.Search)!=0)
+            {
+                _DMARLatch = true;  // signal!
+            }
 
             if (_CartridgeOut)
                 _StatusRegister |= StatusFlags.CartridgeOut | StatusFlags.WriteProtect; // with no cartridge, the WP flag is also always set; nothing to push the button.
@@ -879,7 +914,6 @@ namespace HP9825CPU
             if (((_CommandRegister & CommandFlags.Run) != 0 && (_ServoFailed || _CartridgeOut || _BETFlag || _SearchCompleted)))
             {
                 _FlagLatch = true;  // error flag set...
-                //_LastMode = TapeMode.Idle;  // reset here!
                 _NextRWPulse = null;
             }
             else
@@ -907,7 +941,7 @@ namespace HP9825CPU
                 }
             }
 
-            // TODO: search complete flag...
+            DMAR = _DMARLatch && (_CommandRegister & CommandFlags.Search)!=0;
             Status = _SignalGap && ((_CommandRegister & CommandFlags.Search)==0) && ((_CommandRegister & CommandFlags.Run) != 0 && !(_ServoFailed || _CartridgeOut || _BETFlag || _SearchCompleted)); 
             Flag = _FlagLatch;
         }

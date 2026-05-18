@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO.Pipes;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Reflection.PortableExecutable;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -56,13 +57,13 @@ namespace CommandLineUtils
         /// <returns>True to provide output, false to null-out.</returns>
         public bool IsRequested(VerbosityLevel level)
         {
-            return Verbosity >= level && level >= VerbosityLevel.Errors;
+            return Verbosity >= level && level >= VerbosityLevel.Error;
         }
 
         internal void Prepare(VerbosityLevel runAt = VerbosityLevel.Normal)
         {
             Verbosity = runAt;
-            for(int i = (int) VerbosityLevel.Errors; i<= (int) VerbosityLevel.Trace;i++)
+            for(int i = (int) VerbosityLevel.Error; i<= (int) VerbosityLevel.Trace;i++)
             {
                 // verbosity is from 0 for quiet to n...
                 var tl = (VerbosityLevel)i;
@@ -87,7 +88,7 @@ namespace CommandLineUtils
         /// <returns>The display specifier.</returns>
         protected DisplaySpec? TargetFor(VerbosityLevel level)
         {
-            if (level< VerbosityLevel.Errors || level > VerbosityLevel.Trace)
+            if (level< VerbosityLevel.Error || level > VerbosityLevel.Trace)
                 return null;
             return Targets[(int)level];
         }
@@ -601,12 +602,13 @@ namespace CommandLineUtils
 
         private static readonly char[] Whitspaces = {' ', '\t'};
 
-        public void Write(VerbosityLevel level, SplitMode split, string text)
+        public void Write(VerbosityLevel level, SplitMode split, string? text)
         {
             var spec = TargetFor(level);
             StringBuilder line;
             if (spec == null)
                 return;
+            text ??= string.Empty;
             lock(this)
             {
                 if (!_LineBuffers.TryGetValue(level, out line))
@@ -626,7 +628,9 @@ namespace CommandLineUtils
             {
                 // the bulk... we check if we have a line length limit. if so, ...
                 var max = spec.DisplayWidth.Value;  // maximum...
-                if (line.Length + text.Length > max)
+                int nextBr = text.IndexOf('\n');
+                if (nextBr < 0) nextBr = text.Length;
+                if (line.Length + nextBr > max)
                 {
                     max -= line.Length; // got max. chars now...
                     // need to split...
@@ -673,11 +677,29 @@ namespace CommandLineUtils
                     }
                 }
                 else
-                    line.Append(text);
+                {
+                    if (nextBr < text.Length)
+                    {
+                        line.Append(text, 0, nextBr);
+                        EnsureNewLine(level, true);
+                        Write(level, split, text.Substring(nextBr+1));
+                    }
+                    else
+                        line.Append(text);
+                }
             }
             else
             {
-                line.Append(text);
+                // split at \n...
+                int nextBr = text.IndexOf('\n');
+                int lastStart = 0;
+                while (nextBr>0)
+                {
+                    WriteLine(level, split, text.Substring(lastStart, nextBr - lastStart));
+                    lastStart = nextBr+1;
+                    nextBr = text.IndexOf('\n', nextBr + 1);
+                }
+                line.Append(text, lastStart, text.Length - lastStart);
             }
         }
         public void WriteLine(VerbosityLevel level, SplitMode split, string? text)

@@ -46,10 +46,63 @@ namespace CommandLineUtils
         protected ProcessBase()
         {
             Out  = new ConditionalOutputImpl(this, VerbosityLevel.Normal);
-            Error = new ConditionalOutputImpl(this, VerbosityLevel.Errors);
-            Warning  = new ConditionalOutputImpl(this, VerbosityLevel.Warnings);
+            Error = new ConditionalOutputImpl(this, VerbosityLevel.Error);
+            Warning  = new ConditionalOutputImpl(this, VerbosityLevel.Warning);
             Verbose  = new ConditionalOutputImpl(this, VerbosityLevel.Verbose);
             Trace  = new ConditionalOutputImpl(this, VerbosityLevel.Trace);
+        }
+
+        public void WriteLine()
+        {
+            this.WriteLine(null);
+        }
+
+        public void WriteLine(string? message, params object?[] args)
+        {
+            if(message == null)
+                Out.WriteLine(SplitMode.None, null);
+            else
+                Out.WriteLine(SplitMode.None, string.Format(message, args));
+        }
+        public void Write(string? message, params object?[] args)
+        {
+            if(message == null)
+                Out.WriteLine(SplitMode.None, null);
+            else
+                Out.Write(SplitMode.None, string.Format(message, args));
+        }
+
+        public void WriteLine(string? message)
+        {
+            Out.WriteLine(SplitMode.None, message);
+        }
+        public void Write(string? message)
+        {
+            Out.WriteLine(SplitMode.None, message);
+        }
+
+        public void WriteLine(SplitMode split, string? message, params object?[] args)
+        {
+            if(message == null)
+                Out.WriteLine(split, null);
+            else
+                Out.WriteLine(split, string.Format(message, args));
+        }
+        public void Write(SplitMode split, string? message, params object?[] args)
+        {
+            if(message == null)
+                Out.Write(split, null);
+            else
+                Out.Write(split, string.Format(message, args));
+        }
+
+        public void WriteLine(SplitMode split, string? message)
+        {
+            Out.WriteLine(split, message);
+        }
+        public void Write(SplitMode split, string? message)
+        {
+            Out.Write(split, message);
         }
 
         public void WriteLine(VerbosityLevel level, SplitMode split, string? message)
@@ -60,7 +113,7 @@ namespace CommandLineUtils
             {
                 switch (level)
                 {
-                    case VerbosityLevel.Errors:
+                    case VerbosityLevel.Error:
                         Console.Error.WriteLine(message);
                         break;
                     default:
@@ -78,7 +131,7 @@ namespace CommandLineUtils
             {
                 switch (level)
                 {
-                    case VerbosityLevel.Errors:
+                    case VerbosityLevel.Error:
                         Console.Error.Write(message);
                         break;
                     default:
@@ -150,6 +203,7 @@ namespace CommandLineUtils
             return _Parameters.HelpRequested;
         }
 
+        public VerbosityLevel Verbosity => _Parameters?.Verbosity ?? VerbosityLevel.Normal;
 
         private ParameterHandler? _Parameters;
         private ReturnCodeHandler? _ReturnCodes;
@@ -293,6 +347,26 @@ namespace CommandLineUtils
             public ITableFormatter Table(Action<ITableBuilder> creator)
             {
                 return _Parent.Output.Table(_Level, creator);
+            }
+
+            public void Write(SplitMode split, string? text)
+            {
+                _Parent.Output.Write(_Level, split, text);
+            }
+
+            public void Write(string? text)
+            {
+                _Parent.Output.Write(_Level, SplitMode.None, text);
+            }
+
+            public void WriteLine(SplitMode split, string? text)
+            {
+                _Parent.Output.WriteLine(_Level, split, text);
+            }
+
+            public void WriteLine(string? text)
+            {
+                _Parent.Output.WriteLine(_Level, SplitMode.None, text);
             }
         }
     }

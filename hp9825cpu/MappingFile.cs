@@ -268,6 +268,15 @@ namespace HP9825CPU
                                     var numStr = NextWord(ref line) ?? throw new InvalidOperationException();
                                     relativeAddress = ParseNumber(ctx, numStr);
                                 }
+                                // if (line.Length > 1 && line[0]=='*' && char.IsAsciiDigit(line[1]))
+                                // {
+                                //     line = line.Substring(1);   // trim "*" 
+                                //     lenStr = NextWord(ref line);
+                                //     if (lenStr == null) throw new InvalidOperationException("??!");
+                                //     length = ParseNumber(ctx, lenStr);
+                                //     if (length < 1 || length > 0xFFFF)
+                                //         throw ctx.Error(MappingFileErrorCode.LabelIsInvalid, $"The length for {type} is invalid: {length}!");
+                                // }
                                 break;
                             default:
                                 throw ctx.Error(MappingFileErrorCode.MissingSection, $"The label type {type} is undefined!");
@@ -687,7 +696,7 @@ namespace HP9825CPU
                                                 if (def.RelativeAddress.HasValue)
                                                     labelFor = RelativeAddress(labelFor, def.RelativeAddress.Value);
                                                 // TODO: value to output...
-                                                line = AssemblyLine.FromDef(SourceLineRef.Unknown, address, null, labelFor ?? "?", indirect, label, comment);
+                                                line = AssemblyLine.FromDef(SourceLineRef.Unknown, address, indirect ? (value | 0x8000): value, labelFor ?? "?", indirect, label, comment);
                                             }
                                             address++;
                                             break;
@@ -703,7 +712,14 @@ namespace HP9825CPU
                                             {
                                                 int lLen = Math.Min(num, 8);
                                                 for (int i = 0; i < lLen; i++)
+                                                {
                                                     numBuf[i] = memory[address + i];
+                                                    if (def.DataTypeKey.Equals("dec", StringComparison.InvariantCultureIgnoreCase) && numBuf[i] > 0x7FFF)
+                                                    {
+                                                        // assume negative number!
+                                                        numBuf[i] = (((numBuf[i] - 1) ^ 0xFFFF) & 0xFFFF) * -1;
+                                                    }
+                                                }
                                                 if (printer != null) 
                                                 {
                                                     def.DataTypeKey ??= "DEC";

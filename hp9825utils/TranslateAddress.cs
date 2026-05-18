@@ -25,6 +25,7 @@ namespace HP9825Utils
             using (var tab = this.Output.Table(VerbosityLevel.Normal, 
                 x=>x.Column(10,30, x=>x.Align(HorizontalAlignment.Left).Head("Name"))
                     .Column(10, x=>x.Align(HorizontalAlignment.Right).Head("Normal").Format("x4"))
+                    .Column(10, x=>x.Align(HorizontalAlignment.Right).Head("Normal (dec)"))
                     .Column(10, x=>x.Align(HorizontalAlignment.Right).Head("Length"))
                     .Column(10, x=>x.Align(HorizontalAlignment.Right).Head("InvertedBase").Format("x4"))
                     .Column(10, x=>x.Align(HorizontalAlignment.Right).Head("InvertedLimit").Format("x4"))
@@ -52,7 +53,7 @@ namespace HP9825Utils
             int invertedMaxAddress = (~(address + length - 1) & 0x7FFF);
             int bankBase = bankSize * targetBank;
 
-            tab.Line(rom, address,length, invertedBaseAddress, invertedMaxAddress, invertedMaxAddress + bankBase, invertedBaseAddress + bankBase, invertedMaxAddress + bankBase);
+            tab.Line(rom, address, address, length, invertedBaseAddress, invertedMaxAddress, invertedMaxAddress + bankBase, invertedBaseAddress + bankBase, invertedMaxAddress + bankBase);
         }
     }
 }

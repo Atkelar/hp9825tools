@@ -2,6 +2,9 @@ using System;
 
 namespace CommandLineUtils
 {
+    /// <summary>
+    /// A wrapper interface for a specific "output level" to avoid having to deal with lots of "ifs" and "passing along" info...
+    /// </summary>
     public interface IConditionalOutput
     {
         /// <summary>
@@ -31,5 +34,29 @@ namespace CommandLineUtils
         /// <param name="creator">Callback to create the table; will only get called if the level is actually requested.</param>
         /// <returns>A table formatter to use to create tabular output!</returns>
         public ITableFormatter Table(Action<ITableBuilder> creator);
+
+        /// <summary>
+        /// Write a string message to the output, if enabled.
+        /// </summary>
+        /// <param name="text">The text to write.</param>
+        /// <param name="split">The split mode for dividing up the provided string.</param>
+        public void Write(SplitMode split, string? text);
+        /// <summary>
+        /// Write a string message followed by a newline to the output, if enabled.
+        /// </summary>
+        /// <param name="text">The text to write.</param>
+        /// <param name="split">The split mode for dividing up the provided string.</param>
+        public void WriteLine(SplitMode split, string? text);
+
+        /// <summary>
+        /// Write a string message to the output, if enabled.
+        /// </summary>
+        /// <param name="text">The text to write.</param>
+        public void Write(string? text);
+        /// <summary>
+        /// Write a string message followed by a newline to the output, if enabled.
+        /// </summary>
+        /// <param name="text">The text to write.</param>
+        public void WriteLine(string? text);
     }
 }

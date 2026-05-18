@@ -1,7 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Formats.Asn1;
+using System.IO;
+using System.IO.Packaging;
 using System.Linq;
+using System.Threading.Tasks;
+using System.Xml;
 
 namespace HP9825CPU
 {
@@ -95,6 +100,14 @@ namespace HP9825CPU
                 d.Reset();
         }
 
+        internal bool IsDMARequested
+        {
+            get
+            {
+                return _Devices.Values.Any(x=>x.DMAR);
+            }
+        }
+
         private int InterruptRequestMask = 0;
 
         internal InterruptLevel PendingInterruptLevel {get => InterruptRequestMask == 0 ? InterruptLevel.None : (( InterruptRequestMask & 0xF0  ) != 0 ? InterruptLevel.High : InterruptLevel.Low ); }
@@ -165,6 +178,21 @@ namespace HP9825CPU
                 selectCode = -1;
             // TODO: implement in-system debugger error reporting log with breakpoint option.
             Debug.WriteLine("Device {0} ({1}) at {2} reported issue: {3}", deviceBase.Name, deviceBase.Type, selectCode, message);
+        }
+
+
+        internal void SaveState(XmlElement managerNode)
+        {
+            managerNode.SetAttribute("irqMask", this.InterruptRequestMask.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            foreach(var item in _Devices)
+            {
+                var n = managerNode.OwnerDocument.CreateElement("device", CpuSimulator.StateSaveNamespace);
+                managerNode.AppendChild(n);
+                n.SetAttribute("sc", item.Key);
+                n.SetAttribute("name", item.Value.Name);
+                n.SetAttribute("type", item.Value.GetType().AssemblyQualifiedName);
+                item.Value.SaveState(n);
+            }
         }
     }
 }
